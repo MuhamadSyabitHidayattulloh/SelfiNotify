@@ -4,6 +4,9 @@ import { ToastProvider } from './components/ui/toast';
 import { Layout } from './components/layout/Layout';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { ApplicationsPage } from './pages/ApplicationsPage';
+import { HistoryPage } from './pages/HistoryPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { LoadingSpinner } from './components/ui/loading-spinner';
 import './App.css';
 
@@ -39,9 +42,9 @@ function AppRoutes() {
             <Layout>
               <Routes>
                 <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/applications" element={<div>Applications Page (Coming Soon)</div>} />
-                <Route path="/history" element={<div>History Page (Coming Soon)</div>} />
-                <Route path="/settings" element={<div>Settings Page (Coming Soon)</div>} />
+                <Route path="/applications" element={<ApplicationsPage />} />
+                <Route path="/history" element={<HistoryPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Layout>
