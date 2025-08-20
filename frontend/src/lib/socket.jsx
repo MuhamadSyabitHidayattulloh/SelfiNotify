@@ -7,13 +7,13 @@ class SocketService {
     this.listeners = new Map();
   }
 
-  connect(serverUrl = 'http://localhost:3000') {
+  connect(serverUrl = 'http://localhost:3001') {
     if (this.socket) {
       this.disconnect();
     }
 
     this.socket = io(serverUrl, {
-      transports: ['websocket', 'polling'],
+      transports: ["websocket"],
       autoConnect: true,
     });
 
