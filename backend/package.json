@@ -5,7 +5,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "seed": "node scripts/seed-database.js",
+    "test": "echo \"Backend tests will be added here\" && exit 0"
   },
   "keywords": [],
   "author": "MuhamadSyabitHidayattulloh",
