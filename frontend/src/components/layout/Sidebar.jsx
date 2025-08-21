@@ -15,22 +15,22 @@ import { Button } from '../ui/button';
 const navigation = [
   {
     name: 'Dashboard',
-    href: '/dashboard',
+    href: 'dashboard',
     icon: LayoutDashboard,
   },
   {
     name: 'Aplikasi Saya',
-    href: '/applications',
+    href: 'applications',
     icon: Smartphone,
   },
   {
     name: 'Riwayat Notifikasi',
-    href: '/history',
+    href: 'history',
     icon: History,
   },
   {
     name: 'Pengaturan',
-    href: '/settings',
+    href: 'settings',
     icon: Settings,
   },
 ];

@@ -34,23 +34,26 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      
+      {/* Rute yang dilindungi sekarang menggunakan Layout sebagai elemen induk */}
       <Route
-        path="/*"
+        path="/"
         element={
           <ProtectedRoute>
-            <Layout>
-              <Routes>
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/applications" element={<ApplicationsPage />} />
-                <Route path="/history" element={<HistoryPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            </Layout>
+            <Layout />
           </ProtectedRoute>
         }
-      />
+      >
+        {/* Rute anak akan dirender di dalam <Outlet /> milik Layout */}
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="applications" element={<ApplicationsPage />} />
+        <Route path="history" element={<HistoryPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+      </Route>
+
+      {/* Fallback untuk path yang tidak cocok */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
