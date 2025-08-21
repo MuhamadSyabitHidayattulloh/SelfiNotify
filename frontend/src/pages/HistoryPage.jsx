@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { History, Bell, Repeat, Trash2, Search } from 'lucide-react';
+import { History, Bell, Repeat, Trash2, Search, Smartphone } from 'lucide-react';
 import { useToast } from '../components/ui/toast';
 import { notificationsAPI, applicationsAPI } from '../lib/api.jsx';
 import { Button } from '../components/ui/button';
