@@ -7,7 +7,7 @@ class SocketService {
     this.listeners = new Map();
   }
 
-  connect(serverUrl = 'http://localhost:3001') {
+  connect(serverUrl = 'http://localhost:3000') {
     if (this.socket) {
       this.disconnect();
     }
