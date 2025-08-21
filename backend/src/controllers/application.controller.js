@@ -244,6 +244,47 @@ class ApplicationController {
       });
     }
   }
+
+  /**
+   * Bulk delete applications
+   */
+  static async bulkDelete(req, res) {
+    try {
+      const { ids } = req.body;
+
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "ID aplikasi harus berupa array dan tidak boleh kosong",
+        });
+      }
+
+      // Validate that all IDs are numbers
+      if (!ids.every((id) => Number.isInteger(Number(id)) && Number(id) > 0)) {
+        return res.status(400).json({
+          success: false,
+          message: "Semua ID aplikasi harus berupa angka positif",
+        });
+      }
+
+      // Delete applications
+      const deletedCount = await ApplicationModel.bulkDelete(ids);
+
+      res.json({
+        success: true,
+        message: `${deletedCount} aplikasi berhasil dihapus`,
+        data: {
+          deleted_count: deletedCount,
+        },
+      });
+    } catch (error) {
+      console.error("Bulk delete applications error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan server",
+      });
+    }
+  }
 }
 
 module.exports = ApplicationController;

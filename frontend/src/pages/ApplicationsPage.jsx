@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Copy, RefreshCcw, Smartphone, Bell } from 'lucide-react';
+import { Plus, Edit, Trash2, Copy, RefreshCcw, Smartphone, Bell, CheckSquare, Square, Trash2 as BulkTrash } from 'lucide-react';
 import { useToast } from '../components/ui/toast';
 import { applicationsAPI, notificationsAPI } from '../lib/api.jsx';
 import { Button } from '../components/ui/button';
@@ -24,6 +24,12 @@ export function ApplicationsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [appToDelete, setAppToDelete] = useState(null);
   const [connectionStats, setConnectionStats] = useState({});
+  
+  // Bulk operations state
+  const [selectedApps, setSelectedApps] = useState(new Set());
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -43,11 +49,56 @@ export function ApplicationsPage() {
       const response = await applicationsAPI.getAll();
       if (response.data.success) {
         setApplications(response.data.data.applications);
+        // Reset selections when applications change
+        setSelectedApps(new Set());
       }
     } catch (error) {
       toast.error('Error', error.response?.data?.message || 'Gagal memuat daftar aplikasi');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Bulk selection handlers
+  const handleSelectAll = () => {
+    if (selectedApps.size === applications.length) {
+      setSelectedApps(new Set());
+    } else {
+      setSelectedApps(new Set(applications.map(app => app.id)));
+    }
+  };
+
+  const handleSelectApp = (appId) => {
+    const newSelected = new Set(selectedApps);
+    if (newSelected.has(appId)) {
+      newSelected.delete(appId);
+    } else {
+      newSelected.add(appId);
+    }
+    setSelectedApps(newSelected);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedApps.size === 0) {
+      toast.error('Error', 'Pilih aplikasi yang akan dihapus');
+      return;
+    }
+
+    setIsBulkDeleting(true);
+    try {
+      const response = await applicationsAPI.bulkDelete(Array.from(selectedApps));
+      if (response.data.success) {
+        toast.success('Berhasil', response.data.message);
+        setSelectedApps(new Set());
+        loadApplications();
+      } else {
+        toast.error('Error', response.data.message);
+      }
+    } catch (error) {
+      toast.error('Error', error.response?.data?.message || 'Gagal menghapus aplikasi');
+    } finally {
+      setIsBulkDeleting(false);
+      setIsBulkDeleteOpen(false);
     }
   };
 
@@ -170,6 +221,9 @@ export function ApplicationsPage() {
     );
   }
 
+  const hasSelectedApps = selectedApps.size > 0;
+  const isAllSelected = selectedApps.size === applications.length && applications.length > 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -193,10 +247,48 @@ export function ApplicationsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Select All Checkbox - Only show when there are selections */}
+          {hasSelectedApps && (
+            <div className="col-span-full flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSelectAll}
+                className="h-6 w-6 p-0"
+              >
+                {isAllSelected ? (
+                  <CheckSquare className="h-4 w-4 text-primary" />
+                ) : (
+                  <Square className="h-4 w-4" />
+                )}
+              </Button>
+              <span className="text-sm font-medium">
+                {isAllSelected ? 'Batal Pilih Semua' : 'Pilih Semua'}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                ({selectedApps.size} dari {applications.length} dipilih)
+              </span>
+            </div>
+          )}
+
           {applications.map((app) => (
-            <Card key={app.id}>
+            <Card key={app.id} className={selectedApps.has(app.id) ? 'ring-2 ring-primary' : ''}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg font-semibold">{app.name}</CardTitle>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleSelectApp(app.id)}
+                    className="h-5 w-5 p-0"
+                  >
+                    {selectedApps.has(app.id) ? (
+                      <CheckSquare className="h-4 w-4 text-primary" />
+                    ) : (
+                      <Square className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <CardTitle className="text-lg font-semibold">{app.name}</CardTitle>
+                </div>
                 <Badge variant={connectionStats[app.app_token] > 0 ? 'default' : 'secondary'}>
                   {connectionStats[app.app_token] || 0} client
                 </Badge>
@@ -233,6 +325,31 @@ export function ApplicationsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+
+      {/* Floating Bulk Delete Button */}
+      {hasSelectedApps && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button
+            size="lg"
+            variant="destructive"
+            onClick={() => setIsBulkDeleteOpen(true)}
+            disabled={isBulkDeleting}
+            className="shadow-lg hover:shadow-xl transition-shadow"
+          >
+            {isBulkDeleting ? (
+              <>
+                <LoadingSpinner size="sm" className="mr-2" />
+                Menghapus...
+              </>
+            ) : (
+              <>
+                <BulkTrash className="mr-2 h-5 w-5" />
+                Hapus {selectedApps.size}
+              </>
+            )}
+          </Button>
         </div>
       )}
 
@@ -297,6 +414,30 @@ export function ApplicationsPage() {
                 <><LoadingSpinner size="sm" className="mr-2" /> Menghapus...</>
               ) : (
                 'Hapus'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Bulk Delete Dialog */}
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Multiple Aplikasi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tindakan ini tidak dapat diurungkan. Ini akan menghapus 
+              <span className="font-semibold">{selectedApps.size} aplikasi</span> 
+              secara permanen dan semua riwayat notifikasi yang terkait.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isBulkDeleting ? (
+                <><LoadingSpinner size="sm" className="mr-2" /> Menghapus...</>
+              ) : (
+                `Hapus ${selectedApps.size} Aplikasi`
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

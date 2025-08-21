@@ -159,6 +159,32 @@ class ApplicationModel {
       });
     });
   }
+
+  /**
+   * Bulk delete applications
+   * @param {Array<number>} ids
+   * @returns {Promise<number>} Number of deleted applications
+   */
+  static bulkDelete(ids) {
+    return new Promise((resolve, reject) => {
+      if (!ids || ids.length === 0) {
+        resolve(0);
+        return;
+      }
+
+      const db = database.getDatabase();
+      const placeholders = ids.map(() => "?").join(",");
+      const query = `DELETE FROM applications WHERE id IN (${placeholders})`;
+
+      db.run(query, ids, function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(this.changes);
+        }
+      });
+    });
+  }
 }
 
 module.exports = ApplicationModel;

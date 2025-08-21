@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Send, Bell, FileText, Smartphone, AlertCircle } from 'lucide-react';
+import { Send, Bell, FileText, Smartphone, AlertCircle, X, Search, Users } from 'lucide-react';
 import { useToast } from '../components/ui/toast';
 import { notificationsAPI, applicationsAPI } from '../lib/api.jsx';
 import { Button } from '../components/ui/button';
@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { Badge } from '../components/ui/badge';
 import { Alert, AlertDescription } from '../components/ui/alert';
@@ -16,11 +15,16 @@ export function SendNotificationPage() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedApp, setSelectedApp] = useState('');
+  const [selectedApps, setSelectedApps] = useState(new Set());
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [connectionStats, setConnectionStats] = useState({});
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -33,10 +37,6 @@ export function SendNotificationPage() {
       const response = await applicationsAPI.getAll();
       if (response.data.success) {
         setApplications(response.data.data.applications);
-        // Set first app as default if available
-        if (response.data.data.applications.length > 0) {
-          setSelectedApp(response.data.data.applications[0].id.toString());
-        }
       }
     } catch (error) {
       toast.error('Error', error.response?.data?.message || 'Gagal memuat daftar aplikasi');
@@ -45,11 +45,36 @@ export function SendNotificationPage() {
     }
   };
 
+  // Filter applications based on search term
+  const filteredApplications = applications.filter(app =>
+    app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.description?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Application selection handlers
+  const handleSelectApp = (appId) => {
+    const newSelected = new Set(selectedApps);
+    if (newSelected.has(appId)) {
+      newSelected.delete(appId);
+    } else {
+      newSelected.add(appId);
+    }
+    setSelectedApps(newSelected);
+    setSearchTerm('');
+    setIsDropdownOpen(false);
+  };
+
+  const handleRemoveApp = (appId) => {
+    const newSelected = new Set(selectedApps);
+    newSelected.delete(appId);
+    setSelectedApps(newSelected);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!selectedApp) {
-      toast.error('Error', 'Pilih aplikasi terlebih dahulu');
+    if (selectedApps.size === 0) {
+      toast.error('Error', 'Pilih minimal satu aplikasi');
       return;
     }
 
@@ -66,12 +91,25 @@ export function SendNotificationPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await notificationsAPI.send({
-        application_id: parseInt(selectedApp),
-        title: title.trim(),
-        message: message.trim(),
-        file_url: fileUrl.trim() || null,
-      });
+      let response;
+      if (selectedApps.size === 1) {
+        // Single notification
+        const appId = Array.from(selectedApps)[0];
+        response = await notificationsAPI.send({
+          application_id: parseInt(appId),
+          title: title.trim(),
+          message: message.trim(),
+          file_url: fileUrl.trim() || null,
+        });
+      } else {
+        // Bulk notification
+        response = await notificationsAPI.bulkSend({
+          applications: Array.from(selectedApps),
+          title: title.trim(),
+          message: message.trim(),
+          file_url: fileUrl.trim() || null,
+        });
+      }
 
       if (response.data.success) {
         toast.success('Berhasil', response.data.message);
@@ -79,6 +117,7 @@ export function SendNotificationPage() {
         setTitle('');
         setMessage('');
         setFileUrl('');
+        setSelectedApps(new Set());
       } else {
         toast.error('Error', response.data.message);
       }
@@ -90,15 +129,21 @@ export function SendNotificationPage() {
   };
 
   const handleSendTest = async () => {
-    if (!selectedApp) {
-      toast.error('Error', 'Pilih aplikasi terlebih dahulu');
+    if (selectedApps.size === 0) {
+      toast.error('Error', 'Pilih minimal satu aplikasi');
+      return;
+    }
+
+    if (selectedApps.size > 1) {
+      toast.error('Error', 'Test notification hanya bisa dikirim ke satu aplikasi');
       return;
     }
 
     try {
-      const response = await notificationsAPI.sendTest(parseInt(selectedApp));
+      const appId = Array.from(selectedApps)[0];
+      const response = await notificationsAPI.sendTest(parseInt(appId));
       if (response.data.success) {
-        const selectedAppName = applications.find(app => app.id.toString() === selectedApp)?.name;
+        const selectedAppName = applications.find(app => app.id === appId)?.name;
         toast.success('Berhasil', `Notifikasi test berhasil dikirim ke ${selectedAppName}`);
       } else {
         toast.error('Error', response.data.message);
@@ -108,8 +153,10 @@ export function SendNotificationPage() {
     }
   };
 
-  const selectedApplication = applications.find(app => app.id.toString() === selectedApp);
-  const connectedClients = selectedApplication ? connectionStats[selectedApplication.app_token] || 0 : 0;
+  const totalConnectedClients = Array.from(selectedApps).reduce((total, appId) => {
+    const app = applications.find(a => a.id === appId);
+    return total + (connectionStats[app?.app_token] || 0);
+  }, 0);
 
   if (loading) {
     return (
@@ -154,30 +201,94 @@ export function SendNotificationPage() {
                   Form Notifikasi
                 </CardTitle>
                 <CardDescription>
-                  Isi form di bawah untuk mengirim notifikasi ke aplikasi yang dipilih.
+                  {selectedApps.size === 0 
+                    ? 'Pilih aplikasi untuk mengirim notifikasi'
+                    : selectedApps.size === 1
+                    ? 'Kirim notifikasi ke aplikasi yang dipilih'
+                    : `Kirim notifikasi ke ${selectedApps.size} aplikasi sekaligus`
+                  }
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Application Selection */}
                   <div className="grid gap-2">
-                    <Label htmlFor="app-select">Pilih Aplikasi</Label>
-                    <Select value={selectedApp} onValueChange={setSelectedApp}>
-                      <SelectTrigger id="app-select">
-                        <SelectValue placeholder="Pilih aplikasi" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {applications.map(app => (
-                          <SelectItem key={app.id} value={app.id.toString()}>
-                            <div className="flex items-center gap-2">
-                              <span>{app.name}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {connectionStats[app.app_token] || 0} client
-                              </Badge>
+                    <Label>Pilih Aplikasi</Label>
+                    
+                    {/* Selected Apps Chips */}
+                    {selectedApps.size > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {Array.from(selectedApps).map(appId => {
+                          const app = applications.find(a => a.id === appId);
+                          return (
+                            <div key={appId} className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
+                              <span>{app?.name}</span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-4 w-4 p-0 hover:bg-primary/20"
+                                onClick={() => handleRemoveApp(appId)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
                             </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Searchable Dropdown */}
+                    <div className="relative">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Cari dan pilih aplikasi..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          onFocus={() => setIsDropdownOpen(true)}
+                          className="pl-9"
+                        />
+                      </div>
+                      
+                      {/* Dropdown */}
+                      {isDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                          {filteredApplications.length === 0 ? (
+                            <div className="p-3 text-sm text-muted-foreground text-center">
+                              Tidak ada aplikasi yang ditemukan
+                            </div>
+                          ) : (
+                            filteredApplications.map(app => (
+                              <div
+                                key={app.id}
+                                className={`p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0 ${
+                                  selectedApps.has(app.id) ? 'bg-primary/10' : ''
+                                }`}
+                                onClick={() => handleSelectApp(app.id)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <div className="font-medium">{app.name}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {app.description || 'Tidak ada deskripsi'}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="text-xs">
+                                      {connectionStats[app.app_token] || 0} client
+                                    </Badge>
+                                    {selectedApps.has(app.id) && (
+                                      <div className="w-2 h-2 bg-primary rounded-full"></div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid gap-2">
@@ -231,7 +342,7 @@ export function SendNotificationPage() {
                       ) : (
                         <>
                           <Send className="mr-2 h-4 w-4" />
-                          Kirim Notifikasi
+                          {selectedApps.size === 1 ? 'Kirim Notifikasi' : `Kirim ke ${selectedApps.size} Aplikasi`}
                         </>
                       )}
                     </Button>
@@ -239,7 +350,7 @@ export function SendNotificationPage() {
                       type="button" 
                       variant="outline" 
                       onClick={handleSendTest}
-                      disabled={!selectedApp}
+                      disabled={selectedApps.size !== 1}
                     >
                       <Bell className="mr-2 h-4 w-4" />
                       Test
@@ -252,32 +363,28 @@ export function SendNotificationPage() {
 
           {/* Info Section */}
           <div className="space-y-4">
-            {/* Selected App Info */}
-            {selectedApplication && (
+            {/* Selected Apps Info */}
+            {selectedApps.size > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Info Aplikasi</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div>
-                    <Label className="text-sm font-medium">Nama Aplikasi</Label>
-                    <p className="text-sm text-muted-foreground">{selectedApplication.name}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Deskripsi</Label>
+                    <Label className="text-sm font-medium">Aplikasi Dipilih</Label>
                     <p className="text-sm text-muted-foreground">
-                      {selectedApplication.description || 'Tidak ada deskripsi'}
+                      {selectedApps.size} dari {applications.length} aplikasi
                     </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium">Status Koneksi</Label>
+                    <Label className="text-sm font-medium">Total Client</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <Badge variant={connectedClients > 0 ? 'default' : 'secondary'}>
-                        {connectedClients} client terhubung
+                      <Badge variant={totalConnectedClients > 0 ? 'default' : 'secondary'}>
+                        {totalConnectedClients} client terhubung
                       </Badge>
                     </div>
                   </div>
-                  {connectedClients === 0 && (
+                  {totalConnectedClients === 0 && (
                     <Alert>
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
@@ -298,7 +405,7 @@ export function SendNotificationPage() {
                 <div className="flex items-start gap-2">
                   <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
                   <p className="text-sm text-muted-foreground">
-                    Pastikan client aplikasi sudah terhubung sebelum mengirim notifikasi
+                    Pilih satu aplikasi untuk notifikasi tunggal, atau multiple aplikasi untuk bulk send
                   </p>
                 </div>
                 <div className="flex items-start gap-2">
@@ -317,6 +424,14 @@ export function SendNotificationPage() {
             </Card>
           </div>
         </div>
+      )}
+
+      {/* Click outside to close dropdown */}
+      {isDropdownOpen && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setIsDropdownOpen(false)}
+        />
       )}
     </div>
   );

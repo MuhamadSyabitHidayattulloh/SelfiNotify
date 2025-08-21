@@ -12,6 +12,13 @@ const router = express.Router();
 router.post("/send", verifyToken, NotificationController.send);
 
 /**
+ * @route POST /api/notifications/bulk-send
+ * @desc Send notification to multiple applications
+ * @access Private
+ */
+router.post("/bulk-send", verifyToken, NotificationController.bulkSend);
+
+/**
  * @route POST /api/notifications/test
  * @desc Send test notification
  * @access Private
@@ -59,5 +66,12 @@ router.post("/:id/resend", verifyToken, NotificationController.resend);
  * @access Private
  */
 router.delete("/:id", verifyToken, NotificationController.delete);
+
+/**
+ * @route POST /api/notifications/bulk-delete
+ * @desc Bulk delete notifications
+ * @access Private
+ */
+router.post("/bulk-delete", verifyToken, NotificationController.bulkDelete);
 
 module.exports = router;

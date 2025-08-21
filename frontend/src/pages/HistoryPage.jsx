@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { History, Bell, Repeat, Trash2, Search, Smartphone } from 'lucide-react';
+import { History, Bell, Repeat, Trash2, Search, Smartphone, CheckSquare, Square, Trash2 as BulkTrash } from 'lucide-react';
 import { useToast } from '../components/ui/toast';
 import { notificationsAPI, applicationsAPI } from '../lib/api.jsx';
 import { Button } from '../components/ui/button';
@@ -20,6 +20,12 @@ export function HistoryPage() {
   const [notificationToDelete, setNotificationToDelete] = useState(null);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Bulk operations state
+  const [selectedNotifications, setSelectedNotifications] = useState(new Set());
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -43,11 +49,56 @@ export function HistoryPage() {
       const historyResponse = await notificationsAPI.getHistory(params);
       if (historyResponse.data.success) {
         setNotifications(historyResponse.data.data.notifications);
+        // Reset selections when notifications change
+        setSelectedNotifications(new Set());
       }
     } catch (error) {
       toast.error('Error', error.response?.data?.message || 'Gagal memuat riwayat notifikasi');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Bulk selection handlers
+  const handleSelectAll = () => {
+    if (selectedNotifications.size === filteredNotifications.length) {
+      setSelectedNotifications(new Set());
+    } else {
+      setSelectedNotifications(new Set(filteredNotifications.map(notification => notification.id)));
+    }
+  };
+
+  const handleSelectNotification = (notificationId) => {
+    const newSelected = new Set(selectedNotifications);
+    if (newSelected.has(notificationId)) {
+      newSelected.delete(notificationId);
+    } else {
+      newSelected.add(notificationId);
+    }
+    setSelectedNotifications(newSelected);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedNotifications.size === 0) {
+      toast.error('Error', 'Pilih notifikasi yang akan dihapus');
+      return;
+    }
+
+    setIsBulkDeleting(true);
+    try {
+      const response = await notificationsAPI.bulkDelete(Array.from(selectedNotifications));
+      if (response.data.success) {
+        toast.success('Berhasil', response.data.message);
+        setSelectedNotifications(new Set());
+        loadData();
+      } else {
+        toast.error('Error', response.data.message);
+      }
+    } catch (error) {
+      toast.error('Error', error.response?.data?.message || 'Gagal menghapus notifikasi');
+    } finally {
+      setIsBulkDeleting(false);
+      setIsBulkDeleteOpen(false);
     }
   };
 
@@ -108,6 +159,9 @@ export function HistoryPage() {
     );
   }
 
+  const hasSelectedNotifications = selectedNotifications.size > 0;
+  const isAllSelected = selectedNotifications.size === filteredNotifications.length && filteredNotifications.length > 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -165,19 +219,57 @@ export function HistoryPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="space-y-4">
+          {/* Select All Checkbox - Only show when there are selections */}
+          {hasSelectedNotifications && (
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSelectAll}
+                className="h-6 w-6 p-0"
+              >
+                {isAllSelected ? (
+                  <CheckSquare className="h-4 w-4 text-primary" />
+                ) : (
+                  <Square className="h-4 w-4" />
+                )}
+              </Button>
+              <span className="text-sm font-medium">
+                {isAllSelected ? 'Batal Pilih Semua' : 'Pilih Semua'}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                ({selectedNotifications.size} dari {filteredNotifications.length} dipilih)
+              </span>
+            </div>
+          )}
+
           {filteredNotifications.map(notification => (
-            <Card key={notification.id}>
+            <Card key={notification.id} className={selectedNotifications.has(notification.id) ? 'ring-2 ring-primary' : ''}>
               <CardContent className="p-4">
                 <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{notification.title}</p>
-                    <p className="text-muted-foreground text-xs mt-1">{notification.message}</p>
-                    <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                      <Smartphone className="h-3 w-3" />
-                      <span>{notification.application_name}</span>
-                      <History className="h-3 w-3 ml-2" />
-                      <span>{new Date(notification.sent_at).toLocaleString('id-ID')}</span>
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleSelectNotification(notification.id)}
+                      className="h-5 w-5 p-0 mt-1"
+                    >
+                      {selectedNotifications.has(notification.id) ? (
+                        <CheckSquare className="h-4 w-4 text-primary" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{notification.title}</p>
+                      <p className="text-muted-foreground text-xs mt-1">{notification.message}</p>
+                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                        <Smartphone className="h-3 w-3" />
+                        <span>{notification.application_name}</span>
+                        <History className="h-3 w-3 ml-2" />
+                        <span>{new Date(notification.sent_at).toLocaleString('id-ID')}</span>
+                      </div>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 ml-4">
@@ -210,6 +302,31 @@ export function HistoryPage() {
         </div>
       )}
 
+      {/* Floating Bulk Delete Button */}
+      {hasSelectedNotifications && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <Button
+            size="lg"
+            variant="destructive"
+            onClick={() => setIsBulkDeleteOpen(true)}
+            disabled={isBulkDeleting}
+            className="shadow-lg hover:shadow-xl transition-shadow"
+          >
+            {isBulkDeleting ? (
+              <>
+                <LoadingSpinner size="sm" className="mr-2" />
+                Menghapus...
+              </>
+            ) : (
+              <>
+                <BulkTrash className="mr-2 h-5 w-5" />
+                Hapus {selectedNotifications.size}
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
       {/* Confirm Delete Dialog */}
       <AlertDialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
         <AlertDialogContent>
@@ -228,6 +345,30 @@ export function HistoryPage() {
                 <><LoadingSpinner size="sm" className="mr-2" /> Menghapus...</>
               ) : (
                 'Hapus'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm Bulk Delete Dialog */}
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus Multiple Notifikasi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tindakan ini tidak dapat diurungkan. Ini akan menghapus 
+              <span className="font-semibold">{selectedNotifications.size} notifikasi</span> 
+              secara permanen.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isBulkDeleting}>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              {isBulkDeleting ? (
+                <><LoadingSpinner size="sm" className="mr-2" /> Menghapus...</>
+              ) : (
+                `Hapus ${selectedNotifications.size} Notifikasi`
               )}
             </AlertDialogAction>
           </AlertDialogFooter>

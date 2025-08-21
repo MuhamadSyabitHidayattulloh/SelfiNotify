@@ -166,6 +166,85 @@ class NotificationModel {
   }
 
   /**
+   * Bulk delete notifications
+   * @param {Array<number>} ids
+   * @returns {Promise<number>} Number of deleted notifications
+   */
+  static bulkDelete(ids) {
+    return new Promise((resolve, reject) => {
+      if (!ids || ids.length === 0) {
+        resolve(0);
+        return;
+      }
+
+      const db = database.getDatabase();
+      const placeholders = ids.map(() => "?").join(",");
+      const query = `DELETE FROM notification_history WHERE id IN (${placeholders})`;
+
+      db.run(query, ids, function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(this.changes);
+        }
+      });
+    });
+  }
+
+  /**
+   * Bulk create notifications
+   * @param {Array<Object>} notifications
+   * @returns {Promise<Array>} Array of created notifications
+   */
+  static bulkCreate(notifications) {
+    return new Promise((resolve, reject) => {
+      if (!notifications || notifications.length === 0) {
+        resolve([]);
+        return;
+      }
+
+      const db = database.getDatabase();
+      const placeholders = notifications.map(() => "(?, ?, ?, ?, ?)").join(",");
+      const query = `
+        INSERT INTO notification_history (application_id, title, message, file_url, status)
+        VALUES ${placeholders}
+      `;
+
+      const values = [];
+      notifications.forEach((notification) => {
+        values.push(
+          notification.application_id,
+          notification.title,
+          notification.message,
+          notification.file_url || null,
+          notification.status || "SENT"
+        );
+      });
+
+      db.run(query, values, function (err) {
+        if (err) {
+          reject(err);
+        } else {
+          // Get the created notifications
+          const createdIds = [];
+          for (let i = 0; i < notifications.length; i++) {
+            createdIds.push(this.lastID - i);
+          }
+
+          const createdNotifications = notifications.map(
+            (notification, index) => ({
+              id: createdIds[index],
+              ...notification,
+            })
+          );
+
+          resolve(createdNotifications);
+        }
+      });
+    });
+  }
+
+  /**
    * Get notification statistics
    * @returns {Promise<Object>}
    */

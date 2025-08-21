@@ -55,17 +55,20 @@ export const applicationsAPI = {
   update: (id, data) => api.put(`/applications/${id}`, data),
   delete: (id) => api.delete(`/applications/${id}`),
   regenerateToken: (id) => api.post(`/applications/${id}/regenerate-token`),
+  bulkDelete: (ids) => api.post('/applications/bulk-delete', { ids }),
 };
 
 // Notifications API functions
 export const notificationsAPI = {
   send: (data) => api.post('/notifications/send', data),
+  bulkSend: (data) => api.post('/notifications/bulk-send', data),
   sendTest: (application_id) => api.post('/notifications/test', { application_id }),
   getHistory: (params = {}) => api.get('/notifications/history', { params }),
   getStats: () => api.get('/notifications/stats'),
   getById: (id) => api.get(`/notifications/${id}`),
   resend: (id) => api.post(`/notifications/${id}/resend`),
   delete: (id) => api.delete(`/notifications/${id}`),
+  bulkDelete: (ids) => api.post('/notifications/bulk-delete', { ids }),
 };
 
 export default api;
