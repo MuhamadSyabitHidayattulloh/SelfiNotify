@@ -71,66 +71,6 @@ class AuthController {
   }
 
   /**
-   * Register new user
-   */
-  static async register(req, res) {
-    try {
-      const { npk, password } = req.body;
-
-      // Validation
-      if (!npk || !password) {
-        return res.status(400).json({
-          success: false,
-          message: "NPK dan password harus diisi",
-        });
-      }
-
-      if (password.length < 6) {
-        return res.status(400).json({
-          success: false,
-          message: "Password minimal 6 karakter",
-        });
-      }
-
-      // Check if user already exists
-      const existingUser = await UserModel.findByNpk(npk);
-      if (existingUser) {
-        return res.status(409).json({
-          success: false,
-          message: "NPK sudah terdaftar",
-        });
-      }
-
-      // Hash password
-      const saltRounds = 10;
-      const password_hash = await bcrypt.hash(password, saltRounds);
-
-      // Create user
-      const newUser = await UserModel.create({
-        npk,
-        password_hash,
-      });
-
-      res.status(201).json({
-        success: true,
-        message: "User berhasil didaftarkan",
-        data: {
-          user: {
-            id: newUser.id,
-            npk: newUser.npk,
-          },
-        },
-      });
-    } catch (error) {
-      console.error("Register error:", error);
-      res.status(500).json({
-        success: false,
-        message: "Terjadi kesalahan server",
-      });
-    }
-  }
-
-  /**
    * Get current user profile
    */
   static async getProfile(req, res) {

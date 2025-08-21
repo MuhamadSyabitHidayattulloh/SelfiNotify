@@ -12,13 +12,6 @@ const router = express.Router();
 router.post("/login", AuthController.login);
 
 /**
- * @route POST /api/auth/register
- * @desc Register user baru
- * @access Public
- */
-router.post("/register", AuthController.register);
-
-/**
  * @route GET /api/auth/profile
  * @desc Get current user profile
  * @access Private

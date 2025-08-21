@@ -9,14 +9,14 @@ async function seedDatabase() {
         console.log('Connected to database');
 
         // Create default user
-        const userPassword = await bcrypt.hash('user123', 10);
+        const userPassword = await bcrypt.hash('999999', 10);
         
         try {
             await UserModel.create({
-                npk: 'user001',
+                npk: '999999',
                 password_hash: userPassword
             });
-            console.log('✅ Default user created (NPK: user001, Password: user123)');
+            console.log('✅ Default user created (NPK: 999999, Password: 999999)');
         } catch (error) {
             if (error.message.includes('UNIQUE constraint failed')) {
                 console.log('ℹ️  User already exists');

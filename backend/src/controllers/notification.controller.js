@@ -8,7 +8,6 @@ class NotificationController {
     static async send(req, res) {
         try {
             const { application_id, title, message, file_url } = req.body;
-            const userId = req.user.id;
 
             // Validation
             if (!application_id || !title || !message) {
@@ -25,8 +24,8 @@ class NotificationController {
                 });
             }
 
-            // Check if application exists and belongs to user
-            const application = await ApplicationModel.findByIdAndUserId(application_id, userId);
+            // Check if application exists
+            const application = await ApplicationModel.findById(application_id);
             if (!application) {
                 return res.status(404).json({
                     success: false,
@@ -74,17 +73,16 @@ class NotificationController {
     }
 
     /**
-     * Get user's notification history
+     * Get notification history
      */
     static async getHistory(req, res) {
         try {
-            const userId = req.user.id;
             const { limit = 50, offset = 0, application_id } = req.query;
 
             let notifications;
             if (application_id) {
-                // Check if application belongs to user
-                const application = await ApplicationModel.findByIdAndUserId(application_id, userId);
+                // Check if application exists
+                const application = await ApplicationModel.findById(application_id);
                 if (!application) {
                     return res.status(404).json({
                         success: false,
@@ -93,7 +91,7 @@ class NotificationController {
                 }
                 notifications = await NotificationModel.getByApplicationId(application_id, parseInt(limit), parseInt(offset));
             } else {
-                notifications = await NotificationModel.getByUserId(userId, parseInt(limit), parseInt(offset));
+                notifications = await NotificationModel.getAll(parseInt(limit), parseInt(offset));
             }
 
             res.json({
@@ -118,21 +116,12 @@ class NotificationController {
     static async getById(req, res) {
         try {
             const { id } = req.params;
-            const userId = req.user.id;
 
             const notification = await NotificationModel.findById(id);
             if (!notification) {
                 return res.status(404).json({
                     success: false,
                     message: 'Notifikasi tidak ditemukan'
-                });
-            }
-
-            // Check if notification belongs to user's application
-            if (notification.user_id !== userId) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Akses ditolak'
                 });
             }
 
@@ -158,21 +147,12 @@ class NotificationController {
     static async resend(req, res) {
         try {
             const { id } = req.params;
-            const userId = req.user.id;
 
             const notification = await NotificationModel.findById(id);
             if (!notification) {
                 return res.status(404).json({
                     success: false,
                     message: 'Notifikasi tidak ditemukan'
-                });
-            }
-
-            // Check if notification belongs to user's application
-            if (notification.user_id !== userId) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Akses ditolak'
                 });
             }
 
@@ -229,10 +209,9 @@ class NotificationController {
     static async sendTest(req, res) {
         try {
             const { application_id } = req.body;
-            const userId = req.user.id;
 
-            // Check if application exists and belongs to user
-            const application = await ApplicationModel.findByIdAndUserId(application_id, userId);
+            // Check if application exists
+            const application = await ApplicationModel.findById(application_id);
             if (!application) {
                 return res.status(404).json({
                     success: false,
@@ -284,8 +263,7 @@ class NotificationController {
      */
     static async getStats(req, res) {
         try {
-            const userId = req.user.id;
-            const stats = await NotificationModel.getStats(userId);
+            const stats = await NotificationModel.getStats();
 
             res.json({
                 success: true,
@@ -309,9 +287,8 @@ class NotificationController {
     static async delete(req, res) {
         try {
             const { id } = req.params;
-            const userId = req.user.id;
 
-            const deleted = await NotificationModel.delete(id, userId);
+            const deleted = await NotificationModel.delete(id);
             if (!deleted) {
                 return res.status(404).json({
                     success: false,
@@ -334,7 +311,7 @@ class NotificationController {
     }
 
     /**
-     * Get all notifications (admin only)
+     * Get all notifications
      */
     static async getAll(req, res) {
         try {

@@ -13,17 +13,10 @@ router.post('/', verifyToken, ApplicationController.create);
 
 /**
  * @route GET /api/applications
- * @desc Get user's applications
- * @access Private
- */
-router.get('/', verifyToken, ApplicationController.getUserApplications);
-
-/**
- * @route GET /api/applications/all
  * @desc Get all applications
  * @access Private
  */
-router.get('/all', verifyToken, ApplicationController.getAll);
+router.get('/', verifyToken, ApplicationController.getAll);
 
 /**
  * @route GET /api/applications/:id
