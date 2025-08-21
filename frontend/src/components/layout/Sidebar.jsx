@@ -7,7 +7,7 @@ import {
   Settings, 
   Menu,
   X,
-  Bell
+  Send
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from '../ui/button';
@@ -22,6 +22,11 @@ const navigation = [
     name: 'Aplikasi Saya',
     href: 'applications',
     icon: Smartphone,
+  },
+  {
+    name: 'Kirim Notifikasi',
+    href: 'send-notification',
+    icon: Send,
   },
   {
     name: 'Riwayat Notifikasi',
@@ -85,7 +90,7 @@ export function Sidebar({ className }) {
             isCollapsed && 'opacity-0 md:opacity-100'
           )}>
             <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg">
-              <Bell className="h-5 w-5 text-primary-foreground" />
+              <Send className="h-5 w-5 text-primary-foreground" />
             </div>
             {!isCollapsed && (
               <div>
