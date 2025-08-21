@@ -1,6 +1,6 @@
-const express = require('express');
-const NotificationController = require('../controllers/notification.controller');
-const { verifyToken, verifyAdmin } = require('../middleware/auth.middleware');
+const express = require("express");
+const NotificationController = require("../controllers/notification.controller");
+const { verifyToken } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
@@ -9,56 +9,55 @@ const router = express.Router();
  * @desc Send notification to application
  * @access Private
  */
-router.post('/send', verifyToken, NotificationController.send);
+router.post("/send", verifyToken, NotificationController.send);
 
 /**
  * @route POST /api/notifications/test
  * @desc Send test notification
  * @access Private
  */
-router.post('/test', verifyToken, NotificationController.sendTest);
+router.post("/test", verifyToken, NotificationController.sendTest);
 
 /**
  * @route GET /api/notifications/history
  * @desc Get user's notification history
  * @access Private
  */
-router.get('/history', verifyToken, NotificationController.getHistory);
+router.get("/history", verifyToken, NotificationController.getHistory);
 
 /**
  * @route GET /api/notifications/stats
  * @desc Get notification statistics
  * @access Private
  */
-router.get('/stats', verifyToken, NotificationController.getStats);
+router.get("/stats", verifyToken, NotificationController.getStats);
 
 /**
  * @route GET /api/notifications/all
- * @desc Get all notifications (admin only)
- * @access Private (Admin)
+ * @desc Get all notifications
+ * @access Private
  */
-router.get('/all', verifyToken, verifyAdmin, NotificationController.getAll);
+router.get("/all", verifyToken, NotificationController.getAll);
 
 /**
  * @route GET /api/notifications/:id
  * @desc Get notification by ID
  * @access Private
  */
-router.get('/:id', verifyToken, NotificationController.getById);
+router.get("/:id", verifyToken, NotificationController.getById);
 
 /**
  * @route POST /api/notifications/:id/resend
  * @desc Resend notification
  * @access Private
  */
-router.post('/:id/resend', verifyToken, NotificationController.resend);
+router.post("/:id/resend", verifyToken, NotificationController.resend);
 
 /**
  * @route DELETE /api/notifications/:id
  * @desc Delete notification
  * @access Private
  */
-router.delete('/:id', verifyToken, NotificationController.delete);
+router.delete("/:id", verifyToken, NotificationController.delete);
 
 module.exports = router;
-

@@ -10,7 +10,7 @@ import { LoadingSpinner } from '../components/ui/loading-spinner';
 export function SettingsPage() {
   const { user, changePassword } = useAuth();
   const { toast } = useToast();
-
+  
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -18,16 +18,9 @@ export function SettingsPage() {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
-    if (!currentPassword || !newPassword || !confirmNewPassword) {
-      toast.error('Error', 'Semua field password harus diisi.');
-      setIsSubmitting(false);
-      return;
-    }
-
+    
     if (newPassword !== confirmNewPassword) {
-      toast.error('Error', 'Password baru tidak cocok.');
+      toast.error('Error', 'Konfirmasi password tidak cocok.');
       setIsSubmitting(false);
       return;
     }
@@ -68,10 +61,6 @@ export function SettingsPage() {
           <div>
             <Label>NPK</Label>
             <Input value={user?.npk} disabled className="mt-1" />
-          </div>
-          <div>
-            <Label>Role</Label>
-            <Input value={user?.role} disabled className="mt-1 capitalize" />
           </div>
         </CardContent>
       </Card>

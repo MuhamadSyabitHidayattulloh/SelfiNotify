@@ -1,233 +1,229 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const UserModel = require('../models/user.model');
-const config = require('../config');
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const UserModel = require("../models/user.model");
+const config = require("../config");
 
 class AuthController {
-    /**
-     * Login user
-     */
-    static async login(req, res) {
-        try {
-            const { npk, password } = req.body;
+  /**
+   * Login user
+   */
+  static async login(req, res) {
+    try {
+      const { npk, password } = req.body;
 
-            // Validation
-            if (!npk || !password) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'NPK dan password harus diisi'
-                });
-            }
+      // Validation
+      if (!npk || !password) {
+        return res.status(400).json({
+          success: false,
+          message: "NPK dan password harus diisi",
+        });
+      }
 
-            // Find user by NPK
-            const user = await UserModel.findByNpk(npk);
-            if (!user) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'NPK atau password salah'
-                });
-            }
+      // Find user by NPK
+      const user = await UserModel.findByNpk(npk);
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "NPK atau password salah",
+        });
+      }
 
-            // Verify password
-            const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-            if (!isPasswordValid) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'NPK atau password salah'
-                });
-            }
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(
+        password,
+        user.password_hash
+      );
+      if (!isPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          message: "NPK atau password salah",
+        });
+      }
 
-            // Generate JWT token
-            const token = jwt.sign(
-                {
-                    id: user.id,
-                    npk: user.npk,
-                    role: user.role
-                },
-                config.jwtSecret,
-                { expiresIn: '24h' }
-            );
+      // Generate JWT token
+      const token = jwt.sign(
+        {
+          id: user.id,
+          npk: user.npk,
+        },
+        config.jwtSecret,
+        { expiresIn: "24h" }
+      );
 
-            res.json({
-                success: true,
-                message: 'Login berhasil',
-                data: {
-                    token,
-                    user: {
-                        id: user.id,
-                        npk: user.npk,
-                        role: user.role
-                    }
-                }
-            });
-
-        } catch (error) {
-            console.error('Login error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Terjadi kesalahan server'
-            });
-        }
+      res.json({
+        success: true,
+        message: "Login berhasil",
+        data: {
+          token,
+          user: {
+            id: user.id,
+            npk: user.npk,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan server",
+      });
     }
+  }
 
-    /**
-     * Register new user (admin only)
-     */
-    static async register(req, res) {
-        try {
-            const { npk, password, role = 'user' } = req.body;
+  /**
+   * Register new user
+   */
+  static async register(req, res) {
+    try {
+      const { npk, password } = req.body;
 
-            // Validation
-            if (!npk || !password) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'NPK dan password harus diisi'
-                });
-            }
+      // Validation
+      if (!npk || !password) {
+        return res.status(400).json({
+          success: false,
+          message: "NPK dan password harus diisi",
+        });
+      }
 
-            if (password.length < 6) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Password minimal 6 karakter'
-                });
-            }
+      if (password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: "Password minimal 6 karakter",
+        });
+      }
 
-            // Check if user already exists
-            const existingUser = await UserModel.findByNpk(npk);
-            if (existingUser) {
-                return res.status(409).json({
-                    success: false,
-                    message: 'NPK sudah terdaftar'
-                });
-            }
+      // Check if user already exists
+      const existingUser = await UserModel.findByNpk(npk);
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          message: "NPK sudah terdaftar",
+        });
+      }
 
-            // Hash password
-            const saltRounds = 10;
-            const password_hash = await bcrypt.hash(password, saltRounds);
+      // Hash password
+      const saltRounds = 10;
+      const password_hash = await bcrypt.hash(password, saltRounds);
 
-            // Create user
-            const newUser = await UserModel.create({
-                npk,
-                password_hash,
-                role
-            });
+      // Create user
+      const newUser = await UserModel.create({
+        npk,
+        password_hash,
+      });
 
-            res.status(201).json({
-                success: true,
-                message: 'User berhasil didaftarkan',
-                data: {
-                    user: {
-                        id: newUser.id,
-                        npk: newUser.npk,
-                        role: newUser.role
-                    }
-                }
-            });
-
-        } catch (error) {
-            console.error('Register error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Terjadi kesalahan server'
-            });
-        }
+      res.status(201).json({
+        success: true,
+        message: "User berhasil didaftarkan",
+        data: {
+          user: {
+            id: newUser.id,
+            npk: newUser.npk,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Register error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan server",
+      });
     }
+  }
 
-    /**
-     * Get current user profile
-     */
-    static async getProfile(req, res) {
-        try {
-            const user = await UserModel.findById(req.user.id);
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User tidak ditemukan'
-                });
-            }
+  /**
+   * Get current user profile
+   */
+  static async getProfile(req, res) {
+    try {
+      const user = await UserModel.findById(req.user.id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User tidak ditemukan",
+        });
+      }
 
-            res.json({
-                success: true,
-                data: {
-                    user: {
-                        id: user.id,
-                        npk: user.npk,
-                        role: user.role,
-                        created_at: user.created_at
-                    }
-                }
-            });
-
-        } catch (error) {
-            console.error('Get profile error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Terjadi kesalahan server'
-            });
-        }
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            npk: user.npk,
+            created_at: user.created_at,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Get profile error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan server",
+      });
     }
+  }
 
-    /**
-     * Change password
-     */
-    static async changePassword(req, res) {
-        try {
-            const { currentPassword, newPassword } = req.body;
+  /**
+   * Change password
+   */
+  static async changePassword(req, res) {
+    try {
+      const { currentPassword, newPassword } = req.body;
 
-            // Validation
-            if (!currentPassword || !newPassword) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Password lama dan password baru harus diisi'
-                });
-            }
+      // Validation
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({
+          success: false,
+          message: "Password lama dan password baru harus diisi",
+        });
+      }
 
-            if (newPassword.length < 6) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Password baru minimal 6 karakter'
-                });
-            }
+      if (newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: "Password baru minimal 6 karakter",
+        });
+      }
 
-            // Get current user
-            const user = await UserModel.findById(req.user.id);
-            if (!user) {
-                return res.status(404).json({
-                    success: false,
-                    message: 'User tidak ditemukan'
-                });
-            }
+      // Get current user
+      const user = await UserModel.findById(req.user.id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User tidak ditemukan",
+        });
+      }
 
-            // Verify current password
-            const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
-            if (!isCurrentPasswordValid) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Password lama salah'
-                });
-            }
+      // Verify current password
+      const isCurrentPasswordValid = await bcrypt.compare(
+        currentPassword,
+        user.password_hash
+      );
+      if (!isCurrentPasswordValid) {
+        return res.status(401).json({
+          success: false,
+          message: "Password lama salah",
+        });
+      }
 
-            // Hash new password
-            const saltRounds = 10;
-            const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+      // Hash new password
+      const saltRounds = 10;
+      const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
 
-            // Update password
-            await UserModel.update(req.user.id, { password_hash: newPasswordHash });
+      // Update password
+      await UserModel.update(req.user.id, { password_hash: newPasswordHash });
 
-            res.json({
-                success: true,
-                message: 'Password berhasil diubah'
-            });
-
-        } catch (error) {
-            console.error('Change password error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Terjadi kesalahan server'
-            });
-        }
+      res.json({
+        success: true,
+        message: "Password berhasil diubah",
+      });
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan server",
+      });
     }
+  }
 }
 
 module.exports = AuthController;
-

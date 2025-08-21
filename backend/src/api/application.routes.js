@@ -1,6 +1,6 @@
 const express = require('express');
 const ApplicationController = require('../controllers/application.controller');
-const { verifyToken, verifyAdmin } = require('../middleware/auth.middleware');
+const { verifyToken } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 
@@ -20,10 +20,10 @@ router.get('/', verifyToken, ApplicationController.getUserApplications);
 
 /**
  * @route GET /api/applications/all
- * @desc Get all applications (admin only)
- * @access Private (Admin)
+ * @desc Get all applications
+ * @access Private
  */
-router.get('/all', verifyToken, verifyAdmin, ApplicationController.getAll);
+router.get('/all', verifyToken, ApplicationController.getAll);
 
 /**
  * @route GET /api/applications/:id

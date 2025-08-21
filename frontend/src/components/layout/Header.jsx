@@ -69,8 +69,8 @@ export function Header() {
               </div>
               <div className="hidden md:block text-left">
                 <p className="text-sm font-medium">{user?.npk || 'User'}</p>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {user?.role || 'user'}
+                <p className="text-xs text-muted-foreground">
+                  Pengguna
                 </p>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -82,7 +82,7 @@ export function Header() {
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium">{user?.npk}</p>
                 <p className="text-xs text-muted-foreground">
-                  Role: {user?.role}
+                  Pengguna SelfiNotify
                 </p>
               </div>
             </DropdownMenuLabel>
