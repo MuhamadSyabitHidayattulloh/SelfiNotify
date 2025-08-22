@@ -1,6 +1,6 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const UserModel = require("../models/user.model");
+const User = require("../models/user.model"); // Changed from UserModel
 const config = require("../config");
 
 class AuthController {
@@ -20,7 +20,7 @@ class AuthController {
       }
 
       // Find user by NPK
-      const user = await UserModel.findByNpk(npk);
+      const user = await User.findOne({ where: { npk } }); // Using Sequelize findOne
       if (!user) {
         return res.status(401).json({
           success: false,
@@ -75,7 +75,7 @@ class AuthController {
    */
   static async getProfile(req, res) {
     try {
-      const user = await UserModel.findById(req.user.id);
+      const user = await User.findByPk(req.user.id); // Using Sequelize findByPk
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -125,7 +125,7 @@ class AuthController {
       }
 
       // Get current user
-      const user = await UserModel.findById(req.user.id);
+      const user = await User.findByPk(req.user.id); // Using Sequelize findByPk
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -150,7 +150,7 @@ class AuthController {
       const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
 
       // Update password
-      await UserModel.update(req.user.id, { password_hash: newPasswordHash });
+      await user.update({ password_hash: newPasswordHash }); // Using Sequelize update
 
       res.json({
         success: true,
@@ -167,3 +167,5 @@ class AuthController {
 }
 
 module.exports = AuthController;
+
+

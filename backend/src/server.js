@@ -87,7 +87,7 @@ app.use((err, req, res, next) => {
 async function startServer() {
     try {
         // Connect to database
-        await database.connect();
+        await database.connectDB();
         console.log('Database connected successfully');
 
         // Start server
@@ -109,25 +109,19 @@ async function startServer() {
 }
 
 // Handle graceful shutdown
-process.on('SIGTERM', async () => {
+process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully');
     server.close(() => {
         console.log('HTTP server closed');
-        database.close().then(() => {
-            console.log('Database connection closed');
-            process.exit(0);
-        });
+        process.exit(0);
     });
 });
 
-process.on('SIGINT', async () => {
-    console.log('SIGINT received, shutting down gracefully');
+process.on("SIGINT", () => {
+    console.log("SIGINT received, shutting down gracefully");
     server.close(() => {
-        console.log('HTTP server closed');
-        database.close().then(() => {
-            console.log('Database connection closed');
-            process.exit(0);
-        });
+        console.log("HTTP server closed");
+        process.exit(0);
     });
 });
 

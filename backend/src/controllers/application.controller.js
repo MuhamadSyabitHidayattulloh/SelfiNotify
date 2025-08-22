@@ -1,4 +1,4 @@
-const ApplicationModel = require("../models/application.model");
+const Application = require("../models/application.model"); // Changed from ApplicationModel
 const { generateAppToken } = require("../utils/token.generator");
 
 class ApplicationController {
@@ -35,7 +35,7 @@ class ApplicationController {
       const appToken = generateAppToken();
 
       // Create application
-      const newApp = await ApplicationModel.create({
+      const newApp = await Application.create({
         name: name.trim(),
         description: description ? description.trim() : null,
         platform: platform,
@@ -63,7 +63,7 @@ class ApplicationController {
    */
   static async getAll(req, res) {
     try {
-      const applications = await ApplicationModel.getAll();
+      const applications = await Application.findAll({ order: [["created_at", "DESC"]] }); // Using Sequelize findAll
 
       res.json({
         success: true,
@@ -87,7 +87,7 @@ class ApplicationController {
     try {
       const { id } = req.params;
 
-      const application = await ApplicationModel.findById(id);
+      const application = await Application.findByPk(id); // Using Sequelize findByPk
       if (!application) {
         return res.status(404).json({
           success: false,
@@ -141,7 +141,7 @@ class ApplicationController {
       }
 
       // Check if application exists
-      const existingApp = await ApplicationModel.findById(id);
+      const existingApp = await Application.findByPk(id); // Using Sequelize findByPk
       if (!existingApp) {
         return res.status(404).json({
           success: false,
@@ -150,7 +150,7 @@ class ApplicationController {
       }
 
       // Update application
-      const updated = await ApplicationModel.update(id, {
+      const updated = await existingApp.update({
         name: name.trim(),
         description: description ? description.trim() : null,
         platform: platform,
@@ -184,7 +184,7 @@ class ApplicationController {
       const { id } = req.params;
 
       // Check if application exists
-      const existingApp = await ApplicationModel.findById(id);
+      const existingApp = await Application.findByPk(id); // Using Sequelize findByPk
       if (!existingApp) {
         return res.status(404).json({
           success: false,
@@ -193,7 +193,7 @@ class ApplicationController {
       }
 
       // Delete application
-      const deleted = await ApplicationModel.delete(id);
+      const deleted = await existingApp.destroy(); // Using Sequelize destroy
       if (!deleted) {
         return res.status(400).json({
           success: false,
@@ -222,7 +222,7 @@ class ApplicationController {
       const { id } = req.params;
 
       // Check if application exists
-      const existingApp = await ApplicationModel.findById(id);
+      const existingApp = await Application.findByPk(id); // Using Sequelize findByPk
       if (!existingApp) {
         return res.status(404).json({
           success: false,
@@ -234,7 +234,7 @@ class ApplicationController {
       const newToken = generateAppToken();
 
       // Update application with new token
-      const updated = await ApplicationModel.update(id, {
+      const updated = await existingApp.update({
         app_token: newToken,
       });
 
@@ -284,7 +284,11 @@ class ApplicationController {
       }
 
       // Delete applications
-      const deletedCount = await ApplicationModel.bulkDelete(ids);
+      const deletedCount = await Application.destroy({
+        where: {
+          id: ids,
+        },
+      });
 
       res.json({
         success: true,
@@ -304,3 +308,5 @@ class ApplicationController {
 }
 
 module.exports = ApplicationController;
+
+
