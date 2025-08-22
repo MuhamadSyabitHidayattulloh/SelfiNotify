@@ -9,14 +9,14 @@ class ApplicationModel {
   static create(appData) {
     return new Promise((resolve, reject) => {
       const db = database.getDatabase();
-      const { name, description, app_token } = appData;
+      const { name, description, platform, app_token } = appData;
 
       const query = `
-                INSERT INTO applications (name, description, app_token)
-                VALUES (?, ?, ?)
+                INSERT INTO applications (name, description, platform, app_token)
+                VALUES (?, ?, ?, ?)
             `;
 
-      db.run(query, [name, description, app_token], function (err) {
+      db.run(query, [name, description, platform, app_token], function (err) {
         if (err) {
           reject(err);
         } else {
@@ -24,6 +24,7 @@ class ApplicationModel {
             id: this.lastID,
             name,
             description,
+            platform,
             app_token,
           });
         }
@@ -39,7 +40,7 @@ class ApplicationModel {
     return new Promise((resolve, reject) => {
       const db = database.getDatabase();
       const query = `
-                SELECT id, name, description, app_token, created_at
+                SELECT id, name, description, platform, app_token, created_at
                 FROM applications 
                 ORDER BY created_at DESC
             `;
@@ -103,7 +104,7 @@ class ApplicationModel {
   static update(id, updateData) {
     return new Promise((resolve, reject) => {
       const db = database.getDatabase();
-      const { name, description, app_token } = updateData;
+      const { name, description, platform, app_token } = updateData;
 
       let query = "UPDATE applications SET ";
       let params = [];
@@ -116,6 +117,10 @@ class ApplicationModel {
       if (description !== undefined) {
         updates.push("description = ?");
         params.push(description);
+      }
+      if (platform) {
+        updates.push("platform = ?");
+        params.push(platform);
       }
       if (app_token) {
         updates.push("app_token = ?");

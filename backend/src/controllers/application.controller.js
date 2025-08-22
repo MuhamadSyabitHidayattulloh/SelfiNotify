@@ -7,7 +7,7 @@ class ApplicationController {
    */
   static async create(req, res) {
     try {
-      const { name, description } = req.body;
+      const { name, description, platform } = req.body;
 
       // Validation
       if (!name || name.trim().length === 0) {
@@ -24,6 +24,13 @@ class ApplicationController {
         });
       }
 
+      if (!platform || !["mobile", "website"].includes(platform)) {
+        return res.status(400).json({
+          success: false,
+          message: "Platform harus dipilih (mobile atau website)",
+        });
+      }
+
       // Generate unique token
       const appToken = generateAppToken();
 
@@ -31,6 +38,7 @@ class ApplicationController {
       const newApp = await ApplicationModel.create({
         name: name.trim(),
         description: description ? description.trim() : null,
+        platform: platform,
         app_token: appToken,
       });
 
@@ -108,7 +116,7 @@ class ApplicationController {
   static async update(req, res) {
     try {
       const { id } = req.params;
-      const { name, description } = req.body;
+      const { name, description, platform } = req.body;
 
       // Validation
       if (!name || name.trim().length === 0) {
@@ -125,6 +133,13 @@ class ApplicationController {
         });
       }
 
+      if (platform && !["mobile", "website"].includes(platform)) {
+        return res.status(400).json({
+          success: false,
+          message: "Platform harus mobile atau website",
+        });
+      }
+
       // Check if application exists
       const existingApp = await ApplicationModel.findById(id);
       if (!existingApp) {
@@ -138,6 +153,7 @@ class ApplicationController {
       const updated = await ApplicationModel.update(id, {
         name: name.trim(),
         description: description ? description.trim() : null,
+        platform: platform,
       });
 
       if (!updated) {

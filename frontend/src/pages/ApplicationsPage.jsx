@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Copy, RefreshCcw, Smartphone, Bell, CheckSquare, Square, Trash2 as BulkTrash } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Plus, Edit, Trash2, Copy, RefreshCcw, Smartphone, Bell, CheckSquare, Square, Trash2 as BulkTrash, Search } from 'lucide-react';
 import { useToast } from '../components/ui/toast';
 import { applicationsAPI, notificationsAPI } from '../lib/api.jsx';
 import { Button } from '../components/ui/button';
@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '../components/ui/alert-dialog';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
@@ -21,9 +22,15 @@ export function ApplicationsPage() {
   const [currentApp, setCurrentApp] = useState(null);
   const [appName, setAppName] = useState('');
   const [appDescription, setAppDescription] = useState('');
+  const [appPlatform, setAppPlatform] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [appToDelete, setAppToDelete] = useState(null);
   const [connectionStats, setConnectionStats] = useState({});
+  
+  // Filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+  const [platformFilter, setPlatformFilter] = useState('all');
   
   // Bulk operations state
   const [selectedApps, setSelectedApps] = useState(new Set());
@@ -61,10 +68,10 @@ export function ApplicationsPage() {
 
   // Bulk selection handlers
   const handleSelectAll = () => {
-    if (selectedApps.size === applications.length) {
+    if (selectedApps.size === filteredApplications.length) {
       setSelectedApps(new Set());
     } else {
-      setSelectedApps(new Set(applications.map(app => app.id)));
+      setSelectedApps(new Set(filteredApplications.map(app => app.id)));
     }
   };
 
@@ -106,6 +113,7 @@ export function ApplicationsPage() {
     setCurrentApp(null);
     setAppName('');
     setAppDescription('');
+    setAppPlatform('');
     setIsModalOpen(true);
   };
 
@@ -113,6 +121,7 @@ export function ApplicationsPage() {
     setCurrentApp(app);
     setAppName(app.name);
     setAppDescription(app.description || '');
+    setAppPlatform(app.platform || '');
     setIsModalOpen(true);
   };
 
@@ -126,17 +135,25 @@ export function ApplicationsPage() {
       return;
     }
 
+    if (!appPlatform) {
+      toast.error('Error', 'Platform harus dipilih');
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       let response;
       if (currentApp) {
         response = await applicationsAPI.update(currentApp.id, {
           name: appName.trim(),
           description: appDescription.trim(),
+          platform: appPlatform,
         });
       } else {
         response = await applicationsAPI.create({
           name: appName.trim(),
           description: appDescription.trim(),
+          platform: appPlatform,
         });
       }
 
@@ -213,6 +230,26 @@ export function ApplicationsPage() {
     }
   };
 
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Filter applications based on search and platform
+  const filteredApplications = applications.filter(app => {
+    const matchesSearch = app.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+                         (app.description && app.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
+    const matchesPlatform = platformFilter === 'all' || app.platform === platformFilter;
+    return matchesSearch && matchesPlatform;
+  });
+
+  const hasSelectedApps = selectedApps.size > 0;
+  const isAllSelected = selectedApps.size === filteredApplications.length && filteredApplications.length > 0;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -220,9 +257,6 @@ export function ApplicationsPage() {
       </div>
     );
   }
-
-  const hasSelectedApps = selectedApps.size > 0;
-  const isAllSelected = selectedApps.size === applications.length && applications.length > 0;
 
   return (
     <div className="space-y-6">
@@ -233,6 +267,77 @@ export function ApplicationsPage() {
         </Button>
       </div>
 
+      {/* Filter Section */}
+      {applications.length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Search Input */}
+              <div className="flex-1">
+                <Label htmlFor="search" className="text-sm font-medium mb-2 block">
+                  Cari Aplikasi
+                </Label>
+                                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="search"
+                      placeholder="Cari berdasarkan nama atau deskripsi..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                    {searchTerm !== debouncedSearchTerm && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <LoadingSpinner size="sm" />
+                      </div>
+                    )}
+                  </div>
+              </div>
+              
+              {/* Platform Filter */}
+              <div className="sm:w-48">
+                <Label htmlFor="platformFilter" className="text-sm font-medium mb-2 block">
+                  Filter Platform
+                </Label>
+                <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Semua Platform" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Platform</SelectItem>
+                    <SelectItem value="mobile">📱 Mobile</SelectItem>
+                    <SelectItem value="website">🌐 Website</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Filter Summary */}
+            {(searchTerm || platformFilter !== 'all') && (
+              <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                <span className="text-sm text-muted-foreground">
+                  Menampilkan {filteredApplications.length} dari {applications.length} aplikasi
+                  {debouncedSearchTerm && ` untuk pencarian "${debouncedSearchTerm}"`}
+                  {platformFilter !== 'all' && ` pada platform ${platformFilter === 'mobile' ? 'Mobile' : 'Website'}`}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setPlatformFilter('all');
+                    setSelectedApps(new Set());
+                  }}
+                  className="h-6 px-2 text-xs"
+                >
+                  Reset Filter
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {applications.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
@@ -242,6 +347,25 @@ export function ApplicationsPage() {
             </p>
             <Button onClick={handleCreateNew}>
               <Plus className="mr-2 h-4 w-4" /> Buat Aplikasi Pertama
+            </Button>
+          </CardContent>
+        </Card>
+      ) : filteredApplications.length === 0 ? (
+        <Card className="text-center py-12">
+          <CardContent>
+            <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <p className="text-lg text-muted-foreground mb-4">
+              Tidak ada aplikasi yang sesuai dengan filter.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSearchTerm('');
+                setPlatformFilter('all');
+                setSelectedApps(new Set());
+              }}
+            >
+              Reset Filter
             </Button>
           </CardContent>
         </Card>
@@ -271,7 +395,7 @@ export function ApplicationsPage() {
             </div>
           )}
 
-          {applications.map((app) => (
+          {filteredApplications.map((app) => (
             <Card key={app.id} className={selectedApps.has(app.id) ? 'ring-2 ring-primary' : ''}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div className="flex items-center gap-3">
@@ -295,6 +419,11 @@ export function ApplicationsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <p className="text-sm text-muted-foreground">{app.description || 'Tidak ada deskripsi'}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="text-xs">
+                    {app.platform === 'mobile' ? '📱 Mobile' : '🌐 Website'}
+                  </Badge>
+                </div>
                 <div className="relative flex items-center space-x-2 rounded-md bg-muted p-2 text-sm font-mono">
                   <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
                     {app.app_token}
@@ -382,6 +511,18 @@ export function ApplicationsPage() {
                 placeholder="Deskripsi singkat tentang aplikasi ini"
                 disabled={isSubmitting}
               />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="appPlatform">Platform *</Label>
+              <Select value={appPlatform} onValueChange={setAppPlatform} disabled={isSubmitting}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih platform aplikasi" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mobile">📱 Mobile</SelectItem>
+                  <SelectItem value="website">🌐 Website</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>

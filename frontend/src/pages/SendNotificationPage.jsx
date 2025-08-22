@@ -276,6 +276,9 @@ export function SendNotificationPage() {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline" className="text-xs">
+                                      {app.platform === 'mobile' ? '📱 Mobile' : '🌐 Website'}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-xs">
                                       {connectionStats[app.app_token] || 0} client
                                     </Badge>
                                     {selectedApps.has(app.id) && (

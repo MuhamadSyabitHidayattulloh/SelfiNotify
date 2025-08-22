@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { History, Bell, Repeat, Trash2, Search, Smartphone, CheckSquare, Square, Trash2 as BulkTrash } from 'lucide-react';
 import { useToast } from '../components/ui/toast';
 import { notificationsAPI, applicationsAPI } from '../lib/api.jsx';
@@ -17,6 +17,7 @@ export function HistoryPage() {
   const [loading, setLoading] = useState(true);
   const [selectedApp, setSelectedApp] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [notificationToDelete, setNotificationToDelete] = useState(null);
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -145,10 +146,19 @@ export function HistoryPage() {
     }
   };
 
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const filteredNotifications = notifications.filter(notification =>
-    notification.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    notification.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    notification.application_name.toLowerCase().includes(searchTerm.toLowerCase())
+    notification.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+    notification.message.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+    notification.application_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -168,54 +178,111 @@ export function HistoryPage() {
         <h1 className="text-3xl font-bold tracking-tight">Riwayat Notifikasi</h1>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Filter Riwayat</CardTitle>
-          <CardDescription>Saring notifikasi berdasarkan aplikasi atau kata kunci.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          <div>
-            <Label htmlFor="app-filter">Filter Aplikasi</Label>
-            <Select value={selectedApp} onValueChange={setSelectedApp}>
-              <SelectTrigger id="app-filter">
-                <SelectValue placeholder="Pilih Aplikasi" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Aplikasi</SelectItem>
-                {applications.map(app => (
-                  <SelectItem key={app.id} value={app.id.toString()}>
-                    {app.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="search-term">Cari Notifikasi</Label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="search-term"
-                placeholder="Cari judul, pesan, atau nama aplikasi..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
+      {/* Filter Section */}
+      {applications.length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Application Filter */}
+              <div className="sm:w-48">
+                <Label htmlFor="app-filter" className="text-sm font-medium mb-2 block">
+                  Filter Aplikasi
+                </Label>
+                <Select value={selectedApp} onValueChange={setSelectedApp}>
+                  <SelectTrigger id="app-filter">
+                    <SelectValue placeholder="Semua Aplikasi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Aplikasi</SelectItem>
+                    {applications.map(app => (
+                      <SelectItem key={app.id} value={app.id.toString()}>
+                        {app.platform === 'mobile' ? '📱' : '🌐'} {app.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Search Input */}
+              <div className="flex-1">
+                <Label htmlFor="search-term" className="text-sm font-medium mb-2 block">
+                  Cari Notifikasi
+                </Label>
+                                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="search-term"
+                      placeholder="Cari judul, pesan, atau nama aplikasi..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9"
+                    />
+                    {searchTerm !== debouncedSearchTerm && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <LoadingSpinner size="sm" />
+                      </div>
+                    )}
+                  </div>
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+            
+            {/* Filter Summary */}
+            {(searchTerm || selectedApp !== 'all') && (
+              <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                <span className="text-sm text-muted-foreground">
+                  Menampilkan {filteredNotifications.length} dari {notifications.length} notifikasi
+                  {debouncedSearchTerm && ` untuk pencarian "${debouncedSearchTerm}"`}
+                  {selectedApp !== 'all' && ` pada aplikasi ${applications.find(app => app.id.toString() === selectedApp)?.name}`}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedApp('all');
+                    setSelectedNotifications(new Set());
+                  }}
+                  className="h-6 px-2 text-xs"
+                >
+                  Reset Filter
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {filteredNotifications.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
-            <Bell className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-lg text-muted-foreground mb-4">
-              Tidak ada notifikasi yang ditemukan.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Coba ubah filter atau kirim notifikasi baru.
-            </p>
+            {debouncedSearchTerm || selectedApp !== 'all' ? (
+              <>
+                <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <p className="text-lg text-muted-foreground mb-4">
+                  Tidak ada notifikasi yang sesuai dengan filter.
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedApp('all');
+                    setSelectedNotifications(new Set());
+                  }}
+                >
+                  Reset Filter
+                </Button>
+              </>
+            ) : (
+              <>
+                <Bell className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <p className="text-lg text-muted-foreground mb-4">
+                  Tidak ada notifikasi yang ditemukan.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Coba ubah filter atau kirim notifikasi baru.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -264,11 +331,19 @@ export function HistoryPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{notification.title}</p>
                       <p className="text-muted-foreground text-xs mt-1">{notification.message}</p>
-                      <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                        <Smartphone className="h-3 w-3" />
-                        <span>{notification.application_name}</span>
-                        <History className="h-3 w-3 ml-2" />
-                        <span>{new Date(notification.sent_at).toLocaleString('id-ID')}</span>
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Smartphone className="h-3 w-3" />
+                          <span>{notification.application_name}</span>
+                          <History className="h-3 w-3 ml-2" />
+                          <span>{new Date(notification.sent_at).toLocaleString('id-ID')}</span>
+                        </div>
+                        {/* Platform Badge */}
+                        {applications.find(app => app.id.toString() === notification.application_id?.toString()) && (
+                          <Badge variant="outline" className="text-xs">
+                            {applications.find(app => app.id.toString() === notification.application_id?.toString())?.platform === 'mobile' ? '📱 Mobile' : '🌐 Website'}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>

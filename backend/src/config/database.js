@@ -43,6 +43,7 @@ class Database {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name VARCHAR(150) NOT NULL,
                     description TEXT,
+                    platform VARCHAR(20) NOT NULL,
                     app_token VARCHAR(255) UNIQUE NOT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
