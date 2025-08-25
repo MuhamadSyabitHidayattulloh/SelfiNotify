@@ -131,17 +131,6 @@ export function LoginPage() {
               )}
             </Button>
           </form>
-          
-          {/* Demo credentials info */}
-          <div className="mt-6 p-4 bg-muted rounded-lg">
-            <p className="text-sm font-medium text-muted-foreground mb-2">
-              Akun Demo:
-            </p>
-            <div className="text-xs space-y-1 text-muted-foreground">
-              <p><strong>Admin:</strong> NPK: admin, Password: admin123</p>
-              <p><strong>User:</strong> NPK: user001, Password: user123</p>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>
