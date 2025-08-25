@@ -1,30 +1,27 @@
 const { DataTypes } = require("sequelize");
-const { sequelize } = require("../config/database");
+const { masterSequelize } = require("../config/database");
 
-const User = sequelize.define("User", {
-  id: {
-    type: DataTypes.INTEGER,
-    primaryKey: true,
-    autoIncrement: true,
+const User = masterSequelize.define(
+  "User",
+  {
+    username: {
+      type: DataTypes.CHAR(10),
+      primaryKey: true,
+      allowNull: false,
+    },
+    password: {
+      type: DataTypes.STRING(2000),
+      allowNull: false,
+    },
+    name: {
+      type: DataTypes.STRING(500),
+      allowNull: false,
+    },
   },
-  npk: {
-    type: DataTypes.STRING(100),
-    allowNull: false,
-    unique: true,
-  },
-  password_hash: {
-    type: DataTypes.STRING(255),
-    allowNull: false,
-  },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW,
-  },
-}, {
-  tableName: "users",
-  timestamps: false, // Disable Sequelize's default timestamps (createdAt, updatedAt)
-});
+  {
+    tableName: "master_login",
+    timestamps: false,
+  }
+);
 
 module.exports = User;
-
-

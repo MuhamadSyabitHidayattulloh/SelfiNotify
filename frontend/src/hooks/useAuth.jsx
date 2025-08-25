@@ -39,10 +39,10 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (npk, password) => {
+  const login = async (username, password) => {
     try {
       setLoading(true);
-      const response = await authAPI.login(npk, password);
+      const response = await authAPI.login(username, password);
       
       if (response.data.success) {
         const { token, user: userData } = response.data.data;

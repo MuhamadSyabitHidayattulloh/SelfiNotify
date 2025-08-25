@@ -60,7 +60,7 @@ export function SettingsPage() {
         <CardContent className="space-y-4">
           <div>
             <Label>NPK</Label>
-            <Input value={user?.npk} disabled className="mt-1" />
+            <Input value={user?.username} disabled className="mt-1" />
           </div>
         </CardContent>
       </Card>

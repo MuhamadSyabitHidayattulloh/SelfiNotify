@@ -68,7 +68,7 @@ export function Header() {
                 <User className="h-4 w-4 text-primary-foreground" />
               </div>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-medium">{user?.npk || 'User'}</p>
+                <p className="text-sm font-medium">{user?.name || 'User'}</p>
                 <p className="text-xs text-muted-foreground">
                   Pengguna
                 </p>
@@ -80,7 +80,7 @@ export function Header() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user?.npk}</p>
+                <p className="text-sm font-medium">{user?.name}</p>
                 <p className="text-xs text-muted-foreground">
                   Pengguna SelfiNotify
                 </p>

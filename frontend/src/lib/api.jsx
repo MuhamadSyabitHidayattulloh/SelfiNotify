@@ -41,7 +41,7 @@ api.interceptors.response.use(
 
 // Auth API functions
 export const authAPI = {
-  login: (npk, password) => api.post('/auth/login', { npk, password }),
+  login: (username, password) => api.post('/auth/login', { username, password }),
   getProfile: () => api.get('/auth/profile'),
   changePassword: (currentPassword, newPassword) => 
     api.put('/auth/change-password', { currentPassword, newPassword }),

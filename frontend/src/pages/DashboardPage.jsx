@@ -125,7 +125,7 @@ export function DashboardPage() {
       {/* Welcome Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight">
-          Selamat datang, {user?.npk}!
+          Selamat datang, {user?.name}!
         </h1>
         <p className="text-muted-foreground">
           Kelola notifikasi real-time untuk aplikasi Anda

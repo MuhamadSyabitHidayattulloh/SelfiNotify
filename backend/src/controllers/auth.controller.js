@@ -1,6 +1,6 @@
-const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
-const User = require("../models/user.model"); // Changed from UserModel
+const User = require("../models/user.model");
 const config = require("../config");
 
 class AuthController {
@@ -9,42 +9,44 @@ class AuthController {
    */
   static async login(req, res) {
     try {
-      const { npk, password } = req.body;
+      const { username, password } = req.body;
 
       // Validation
-      if (!npk || !password) {
+      if (!username || !password) {
         return res.status(400).json({
           success: false,
-          message: "NPK dan password harus diisi",
+          message: "Username dan password harus diisi",
         });
       }
 
-      // Find user by NPK
-      const user = await User.findOne({ where: { npk } }); // Using Sequelize findOne
+      // Find user by username
+      const user = await User.findOne({ where: { username } });
       if (!user) {
         return res.status(401).json({
           success: false,
-          message: "NPK atau password salah",
+          message: "Username atau password salah",
         });
       }
 
+      // Hash password input with MD5
+      const hashedPassword = crypto
+        .createHash("md5")
+        .update(password)
+        .digest("hex");
+
       // Verify password
-      const isPasswordValid = await bcrypt.compare(
-        password,
-        user.password_hash
-      );
-      if (!isPasswordValid) {
+      if (user.password !== hashedPassword) {
         return res.status(401).json({
           success: false,
-          message: "NPK atau password salah",
+          message: "Username atau password salah",
         });
       }
 
       // Generate JWT token
       const token = jwt.sign(
         {
-          id: user.id,
-          npk: user.npk,
+          username: user.username,
+          name: user.name,
         },
         config.jwtSecret,
         { expiresIn: "24h" }
@@ -56,8 +58,8 @@ class AuthController {
         data: {
           token,
           user: {
-            id: user.id,
-            npk: user.npk,
+            username: user.username,
+            name: user.name,
           },
         },
       });
@@ -75,7 +77,9 @@ class AuthController {
    */
   static async getProfile(req, res) {
     try {
-      const user = await User.findByPk(req.user.id); // Using Sequelize findByPk
+      const user = await User.findOne({
+        where: { username: req.user.username },
+      });
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -87,9 +91,8 @@ class AuthController {
         success: true,
         data: {
           user: {
-            id: user.id,
-            npk: user.npk,
-            created_at: user.created_at,
+            username: user.username,
+            name: user.name,
           },
         },
       });
@@ -125,7 +128,9 @@ class AuthController {
       }
 
       // Get current user
-      const user = await User.findByPk(req.user.id); // Using Sequelize findByPk
+      const user = await User.findOne({
+        where: { username: req.user.username },
+      });
       if (!user) {
         return res.status(404).json({
           success: false,
@@ -133,24 +138,30 @@ class AuthController {
         });
       }
 
+      // Hash current password with MD5
+      const hashedCurrentPassword = crypto
+        .createHash("md5")
+        .update(currentPassword)
+        .digest("hex");
+
       // Verify current password
-      const isCurrentPasswordValid = await bcrypt.compare(
-        currentPassword,
-        user.password_hash
-      );
-      if (!isCurrentPasswordValid) {
+      if (user.password !== hashedCurrentPassword) {
         return res.status(401).json({
           success: false,
           message: "Password lama salah",
         });
       }
 
-      // Hash new password
-      const saltRounds = 10;
-      const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
+      // Hash new password with MD5
+      const hashedNewPassword = crypto
+        .createHash("md5")
+        .update(newPassword)
+        .digest("hex");
 
       // Update password
-      await user.update({ password_hash: newPasswordHash }); // Using Sequelize update
+      await user.update({
+        password: hashedNewPassword,
+      });
 
       res.json({
         success: true,
@@ -167,5 +178,3 @@ class AuthController {
 }
 
 module.exports = AuthController;
-
-

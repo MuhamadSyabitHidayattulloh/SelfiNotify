@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 
 export function LoginPage() {
-  const [npk, setNpk] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,15 +35,15 @@ export function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!npk.trim() || !password.trim()) {
-      toast.error('Error', 'NPK dan password harus diisi');
+    if (!username.trim() || !password.trim()) {
+      toast.error('Error', 'Username dan password harus diisi');
       return;
     }
 
     setIsLoading(true);
     
     try {
-      const result = await login(npk.trim(), password);
+      const result = await login(username.trim(), password);
       
       if (result.success) {
         toast.success('Berhasil', 'Login berhasil! Selamat datang.');
@@ -73,13 +73,13 @@ export function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="npk">NPK</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="npk"
+                id="username"
                 type="text"
-                placeholder="Masukkan NPK Anda"
-                value={npk}
-                onChange={(e) => setNpk(e.target.value)}
+                placeholder="Masukkan username Anda"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 disabled={isLoading}
                 autoComplete="username"
                 autoFocus
