@@ -36,10 +36,24 @@ export function DashboardPage() {
   useEffect(() => {
     loadDashboardData();
     setupSocketListeners();
-  }, []);
+    
+    // Connect to socket service
+    socketService.connect();
+    
+    // Connect dashboard to receive real-time updates
+    if (user?.username) {
+      socketService.connectDashboard(user.username);
+    }
+
+    // Cleanup function
+    return () => {
+      // Remove socket listeners to prevent memory leaks
+      socketService.off('connection_stats');
+    };
+  }, [user?.username]);
 
   const setupSocketListeners = () => {
-    // Listen for real-time connection updates
+    // Listen for real-time connection updates from backend
     socketService.on('connection_stats', (data) => {
       setConnectionStats(data.apps || {});
       setStats(prev => ({
@@ -48,29 +62,16 @@ export function DashboardPage() {
       }));
     });
 
-    socketService.on('client_connected', (data) => {
+    // Load initial connection stats from localStorage
+    const initialStats = socketService.getConnectionStats();
+    if (Object.keys(initialStats).length > 0) {
+      setConnectionStats(initialStats);
+      const totalConnections = Object.values(initialStats).reduce((sum, count) => sum + count, 0);
       setStats(prev => ({
         ...prev,
-        connected_clients: prev.connected_clients + 1
+        connected_clients: totalConnections
       }));
-      toast.info('Client Terhubung', `Client baru terhubung ke aplikasi`);
-    });
-
-    socketService.on('client_disconnected', (data) => {
-      setStats(prev => ({
-        ...prev,
-        connected_clients: Math.max(0, prev.connected_clients - 1)
-      }));
-    });
-
-    socketService.on('notification_sent', (data) => {
-      setStats(prev => ({
-        ...prev,
-        total_notifications: prev.total_notifications + 1,
-        today_notifications: prev.today_notifications + 1
-      }));
-      toast.success('Notifikasi Terkirim', 'Notifikasi berhasil dikirim ke client');
-    });
+    }
   };
 
   const loadDashboardData = async () => {

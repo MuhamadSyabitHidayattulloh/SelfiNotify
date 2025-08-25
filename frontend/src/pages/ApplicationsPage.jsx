@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Copy, RefreshCcw, Smartphone, Bell, CheckSquare, Square, Trash2 as BulkTrash, Search } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/toast';
 import { applicationsAPI, notificationsAPI } from '../lib/api.jsx';
 import { Button } from '../components/ui/button';
@@ -7,14 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '../components/ui/alert-dialog';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { Badge } from '../components/ui/badge';
+import { MultiSelect } from '../components/ui/multi-select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '../components/ui/alert-dialog';
 import socketService from '../lib/socket.jsx';
 
 export function ApplicationsPage() {
+  const { user } = useAuth();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -30,7 +32,7 @@ export function ApplicationsPage() {
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
-  const [platformFilter, setPlatformFilter] = useState('all');
+  const [platformFilter, setPlatformFilter] = useState(new Set());
   
   // Bulk operations state
   const [selectedApps, setSelectedApps] = useState(new Set());
@@ -42,12 +44,35 @@ export function ApplicationsPage() {
   useEffect(() => {
     loadApplications();
     setupSocketListeners();
-  }, []);
+    
+    // Connect to socket service if not already connected
+    if (!socketService.getConnectionStatus()) {
+      socketService.connect();
+    }
+    
+    // Connect dashboard to receive real-time updates
+    if (user?.username) {
+      socketService.connectDashboard(user.username);
+    }
+
+    // Cleanup function
+    return () => {
+      // Remove socket listeners to prevent memory leaks
+      socketService.off('connection_stats');
+    };
+  }, [user?.username]);
 
   const setupSocketListeners = () => {
+    // Listen for real-time connection stats updates from backend
     socketService.on('connection_stats', (data) => {
       setConnectionStats(data.apps || {});
     });
+
+    // Load initial connection stats from localStorage
+    const initialStats = socketService.getConnectionStats();
+    if (Object.keys(initialStats).length > 0) {
+      setConnectionStats(initialStats);
+    }
   };
 
   const loadApplications = async () => {
@@ -239,11 +264,11 @@ export function ApplicationsPage() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Filter applications based on search and platform
+  // Filter applications
   const filteredApplications = applications.filter(app => {
     const matchesSearch = app.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
                          (app.description && app.description.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
-    const matchesPlatform = platformFilter === 'all' || app.platform === platformFilter;
+    const matchesPlatform = platformFilter.size === 0 || platformFilter.has(app.platform);
     return matchesSearch && matchesPlatform;
   });
 
@@ -299,33 +324,35 @@ export function ApplicationsPage() {
                 <Label htmlFor="platformFilter" className="text-sm font-medium mb-2 block">
                   Filter Platform
                 </Label>
-                <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Semua Platform" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Platform</SelectItem>
-                    <SelectItem value="mobile">📱 Mobile</SelectItem>
-                    <SelectItem value="website">🌐 Website</SelectItem>
-                  </SelectContent>
-                </Select>
+                <MultiSelect
+                  options={[
+                    { id: 'mobile', name: '📱 Mobile' }, 
+                    { id: 'website', name: '🌐 Website' }
+                  ]}
+                  selectedValues={platformFilter}
+                  onSelectionChange={setPlatformFilter}
+                  placeholder="Pilih platform..."
+                  className="w-full"
+                  getOptionValue={(option) => option.id}
+                  getOptionLabel={(option) => option.name}
+                />
               </div>
             </div>
             
             {/* Filter Summary */}
-            {(searchTerm || platformFilter !== 'all') && (
+            {(searchTerm || platformFilter.size > 0) && (
               <div className="flex items-center gap-2 mt-4 pt-4 border-t">
                 <span className="text-sm text-muted-foreground">
                   Menampilkan {filteredApplications.length} dari {applications.length} aplikasi
                   {debouncedSearchTerm && ` untuk pencarian "${debouncedSearchTerm}"`}
-                  {platformFilter !== 'all' && ` pada platform ${platformFilter === 'mobile' ? 'Mobile' : 'Website'}`}
+                  {platformFilter.size > 0 && ` pada platform ${Array.from(platformFilter).map(p => p === 'mobile' ? 'Mobile' : 'Website').join(', ')}`}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     setSearchTerm('');
-                    setPlatformFilter('all');
+                    setPlatformFilter(new Set());
                     setSelectedApps(new Set());
                   }}
                   className="h-6 px-2 text-xs"
@@ -361,7 +388,7 @@ export function ApplicationsPage() {
               variant="outline"
               onClick={() => {
                 setSearchTerm('');
-                setPlatformFilter('all');
+                setPlatformFilter(new Set());
                 setSelectedApps(new Set());
               }}
             >
@@ -514,15 +541,17 @@ export function ApplicationsPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="appPlatform">Platform *</Label>
-              <Select value={appPlatform} onValueChange={setAppPlatform} disabled={isSubmitting}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih platform aplikasi" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mobile">📱 Mobile</SelectItem>
-                  <SelectItem value="website">🌐 Website</SelectItem>
-                </SelectContent>
-              </Select>
+              <select
+                id="appPlatform"
+                value={appPlatform}
+                onChange={(e) => setAppPlatform(e.target.value)}
+                disabled={isSubmitting}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">Pilih platform aplikasi</option>
+                <option value="mobile">📱 Mobile</option>
+                <option value="website">🌐 Website</option>
+              </select>
             </div>
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>

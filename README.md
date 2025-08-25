@@ -14,10 +14,11 @@ SelfiNotify adalah aplikasi web yang memungkinkan pengguna untuk mengirimkan not
 - **Pengiriman Notifikasi**: Mengirim notifikasi berisi title, pesan, dan URL file opsional untuk client
 
 ### Fitur Lanjutan
-- **Login dengan JWT Token**: Sistem otentikasi menggunakan NPK dan password
-- **History Notifikasi**: Riwayat semua notifikasi yang telah dikirim
-- **Halaman Pengaturan**: Manajemen akun dan preferensi pengguna
+- **Login dengan JWT Token**: Sistem otentikasi menggunakan username dan password
+- **Dual Database Architecture**: Database terpisah untuk auth (master) dan aplikasi (selfinotify)
+- **History Notifikasi**: Riwayat semua notifikasi yang telah dikirim dengan filter multi-aplikasi
 - **Dashboard Real-time**: Statistik dan monitoring koneksi client secara real-time
+- **Connection Statistics**: Tracking jumlah client yang terhubung per aplikasi
 
 ## Teknologi yang Digunakan
 
@@ -25,65 +26,142 @@ SelfiNotify adalah aplikasi web yang memungkinkan pengguna untuk mengirimkan not
 - Node.js
 - Express.js
 - Socket.IO (WebSocket)
-- SQLite (Database)
+- MSSQL (Database utama)
+- Sequelize ORM
 - JWT (Authentication)
-- bcryptjs (Password Hashing)
+- MD5 (Password Hashing)
+- Centralized Logging System
 
 ### Frontend
 - React.js
-- Tailwind CSS (Offline)
+- Tailwind CSS
+- Radix UI Components
 - React Router DOM
 - Axios (HTTP Client)
 - Socket.IO Client
+- Custom MultiSelect Component
 
 ## Struktur Proyek
 
 ```
-selfinotify/
+SelfiNotify/
 ├── backend/           # Server Node.js
+│   ├── src/
+│   │   ├── api/       # Routes/Endpoints
+│   │   ├── config/    # Konfigurasi dual database
+│   │   ├── controllers/
+│   │   ├── middleware/
+│   │   ├── models/
+│   │   ├── services/
+│   │   └── utils/     # Logger utility
+│   └── package.json
+├── frontend/          # Client React
 │   └── src/
-│       ├── api/       # Routes/Endpoints
-│       ├── config/    # Konfigurasi database
-│       ├── controllers/
-│       ├── middleware/
-│       ├── models/
-│       ├── services/
-│       └── utils/
-└── frontend/          # Client React
-    └── src/
-        ├── components/
-        ├── pages/
-        ├── services/
-        └── styles/
+│       ├── components/
+│       │   ├── ui/    # Reusable UI components
+│       │   └── layout/
+│       ├── pages/
+│       ├── hooks/
+│       └── lib/
+└── README.md
 ```
+
+## Arsitektur Database
+
+### Dual Database Setup
+- **Database Master**: Untuk autentikasi dengan tabel `master_login`
+  - `username` (char 10)
+  - `password` (varchar 2000) - MD5 hashed
+  - `name` (varchar 500)
+
+- **Database SelfiNotify**: Untuk aplikasi utama
+  - Tabel `applications`
+  - Tabel `notification_history`
 
 ## Instalasi dan Setup
 
 ### Prerequisites
 - Node.js (v16 atau lebih baru)
-- npm atau yarn
+- MSSQL Server
+- pnpm (recommended) atau npm
+
+### Environment Variables
+Buat file `.env` di folder backend:
+
+```env
+# Database SelfiNotify (Database Utama)
+DB_NAME=selfinotify
+DB_USER=your_username
+DB_PASSWORD=your_password
+DB_HOST=localhost
+DB_ENCRYPT=false
+DB_TRUST_SERVER_CERTIFICATE=true
+
+# Database Master (Untuk Auth)
+MASTER_DB_NAME=master
+MASTER_DB_USER=your_username
+MASTER_DB_PASSWORD=your_password
+MASTER_DB_HOST=localhost
+MASTER_DB_ENCRYPT=false
+MASTER_DB_TRUST_SERVER_CERTIFICATE=true
+
+# JWT & Server
+JWT_SECRET=your_secret_key
+PORT=3000
+CORS_ORIGIN=*
+```
 
 ### Backend Setup
 ```bash
 cd backend
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 ### Frontend Setup
 ```bash
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 ## Penggunaan
 
-1. Login menggunakan NPK dan password
-2. Buat aplikasi baru di dashboard
-3. Salin token aplikasi yang dihasilkan
-4. Integrasikan token ke client application
-5. Kirim notifikasi melalui dashboard
+1. **Login**: Masuk menggunakan username dan password
+2. **Dashboard**: Lihat statistik real-time dan aplikasi yang terdaftar
+3. **Buat Aplikasi**: Buat aplikasi baru dengan platform mobile/website
+4. **Salin Token**: Salin token aplikasi yang dihasilkan
+5. **Integrasi Client**: Integrasikan token ke client application
+6. **Kirim Notifikasi**: Kirim notifikasi melalui dashboard dengan multi-select aplikasi
+7. **Monitor History**: Lihat riwayat notifikasi dengan filter multi-aplikasi
+
+## Fitur Multi-Select
+
+### MultiSelect Component
+- **Reusable UI Component**: Digunakan di semua halaman yang memerlukan multi-selection
+- **Search & Filter**: Pencarian real-time dalam dropdown
+- **Chips Display**: Menampilkan item yang dipilih sebagai chips
+- **Quick Actions**: Tombol "Pilih Semua" dan "Hapus Semua"
+- **Customizable**: Badge, description, dan label yang fleksibel
+
+### Implementasi di Halaman
+- **HistoryPage**: Filter notifikasi berdasarkan multiple aplikasi
+- **SendNotificationPage**: Pilih multiple aplikasi untuk kirim notifikasi
+- **ApplicationsPage**: Filter berdasarkan multiple platform
+
+## Optimizations
+
+### Backend
+- Centralized logging system
+- Memory leak prevention
+- Proper error handling
+- Clean dependencies
+
+### Frontend
+- Reusable components
+- Memory leak prevention dengan useEffect cleanup
+- Optimized bundle size
+- Consistent UI patterns
 
 ## Kontribusi
 

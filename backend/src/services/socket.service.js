@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
 const Application = require("../models/application.model");
+const logger = require("../utils/logger");
 
 class SocketService {
   constructor() {
@@ -21,7 +22,7 @@ class SocketService {
     });
 
     this.setupEventHandlers();
-    console.log("Socket.IO server initialized");
+    logger.info("Socket.IO server initialized");
   }
 
   /**
@@ -29,7 +30,7 @@ class SocketService {
    */
   setupEventHandlers() {
     this.io.on("connection", (socket) => {
-      console.log(`Client connected: ${socket.id}`);
+      logger.info(`Client connected: ${socket.id}`);
 
       // Handle client authentication with app token
       socket.on("authenticate", async (data) => {
@@ -82,11 +83,14 @@ class SocketService {
             client_count: this.connectedClients.get(app_token).size,
           });
 
-          console.log(
+          // Broadcast updated connection stats to all dashboards
+          this.broadcastConnectionStats();
+
+          logger.info(
             `Client ${socket.id} authenticated for app: ${application.name}`
           );
         } catch (error) {
-          console.error("Authentication error:", error);
+          logger.error("Authentication error:", error);
           socket.emit("auth_error", {
             message: "Authentication failed",
           });
@@ -95,7 +99,7 @@ class SocketService {
 
       // Handle client disconnection
       socket.on("disconnect", () => {
-        console.log(`Client disconnected: ${socket.id}`);
+        logger.info(`Client disconnected: ${socket.id}`);
 
         if (socket.app_token) {
           // Remove from connected clients tracking
@@ -114,6 +118,9 @@ class SocketService {
               application_id: socket.application_id,
               client_count: clients.size,
             });
+
+            // Broadcast updated connection stats to all dashboards
+            this.broadcastConnectionStats();
           }
         }
       });
@@ -131,11 +138,16 @@ class SocketService {
         if (user_id) {
           socket.join(`dashboard_${user_id}`);
           socket.user_id = user_id;
-          console.log(`Dashboard connected for user: ${user_id}`);
+          logger.info(`Dashboard connected for user: ${user_id}`);
 
           // Send current connection stats
           this.sendConnectionStats(socket);
         }
+      });
+
+      // Handle request for connection stats
+      socket.on("request_connection_stats", () => {
+        this.sendConnectionStats(socket);
       });
     });
   }
@@ -148,7 +160,7 @@ class SocketService {
   sendNotification(app_token, notification) {
     if (this.io) {
       this.io.to(app_token).emit("notification", notification);
-      console.log(`Notification sent to app token: ${app_token}`);
+      logger.info(`Notification sent to app token: ${app_token}`);
     }
   }
 
@@ -164,22 +176,42 @@ class SocketService {
   }
 
   /**
-   * Send connection statistics to dashboard
-   * @param {Object} socket
+   * Get connection statistics for dashboard
+   * @returns {Object} Connection stats
    */
-  sendConnectionStats(socket) {
+  getConnectionStats() {
     const stats = {};
     for (const [app_token, clients] of this.connectedClients.entries()) {
       stats[app_token] = clients.size;
     }
 
-    socket.emit("connection_stats", {
+    return {
       total_connections: Array.from(this.connectedClients.values()).reduce(
         (sum, clients) => sum + clients.size,
         0
       ),
       apps: stats,
-    });
+    };
+  }
+
+  /**
+   * Broadcast connection stats to all dashboard clients
+   */
+  broadcastConnectionStats() {
+    if (this.io) {
+      const stats = this.getConnectionStats();
+      this.io.emit("connection_stats", stats);
+      logger.info("Broadcasting connection stats to all dashboards:", stats);
+    }
+  }
+
+  /**
+   * Send connection statistics to dashboard
+   * @param {Object} socket
+   */
+  sendConnectionStats(socket) {
+    const stats = this.getConnectionStats();
+    socket.emit("connection_stats", stats);
   }
 
   /**

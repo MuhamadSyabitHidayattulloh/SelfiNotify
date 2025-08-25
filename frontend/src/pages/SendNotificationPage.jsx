@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Send, Bell, FileText, Smartphone, AlertCircle, X, Search, Users } from 'lucide-react';
+import { Send, Bell, FileText, Smartphone, AlertCircle, Users } from 'lucide-react';
 import { useToast } from '../components/ui/toast';
 import { notificationsAPI, applicationsAPI } from '../lib/api.jsx';
 import { Button } from '../components/ui/button';
@@ -10,6 +10,7 @@ import { Textarea } from '../components/ui/textarea';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { Badge } from '../components/ui/badge';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import { MultiSelect } from '../components/ui/multi-select';
 
 export function SendNotificationPage() {
   const [applications, setApplications] = useState([]);
@@ -20,10 +21,6 @@ export function SendNotificationPage() {
   const [message, setMessage] = useState('');
   const [fileUrl, setFileUrl] = useState('');
   const [connectionStats, setConnectionStats] = useState({});
-  
-  // Search state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   
   const { toast } = useToast();
 
@@ -45,30 +42,7 @@ export function SendNotificationPage() {
     }
   };
 
-  // Filter applications based on search term
-  const filteredApplications = applications.filter(app =>
-    app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    app.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
-  // Application selection handlers
-  const handleSelectApp = (appId) => {
-    const newSelected = new Set(selectedApps);
-    if (newSelected.has(appId)) {
-      newSelected.delete(appId);
-    } else {
-      newSelected.add(appId);
-    }
-    setSelectedApps(newSelected);
-    setSearchTerm('');
-    setIsDropdownOpen(false);
-  };
-
-  const handleRemoveApp = (appId) => {
-    const newSelected = new Set(selectedApps);
-    newSelected.delete(appId);
-    setSelectedApps(newSelected);
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -215,83 +189,20 @@ export function SendNotificationPage() {
                   <div className="grid gap-2">
                     <Label>Pilih Aplikasi</Label>
                     
-                    {/* Selected Apps Chips */}
-                    {selectedApps.size > 0 && (
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        {Array.from(selectedApps).map(appId => {
-                          const app = applications.find(a => a.id === appId);
-                          return (
-                            <div key={appId} className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">
-                              <span>{app?.name}</span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-4 w-4 p-0 hover:bg-primary/20"
-                                onClick={() => handleRemoveApp(appId)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Searchable Dropdown */}
-                    <div className="relative">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          placeholder="Cari dan pilih aplikasi..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          onFocus={() => setIsDropdownOpen(true)}
-                          className="pl-9"
-                        />
-                      </div>
-                      
-                      {/* Dropdown */}
-                      {isDropdownOpen && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
-                          {filteredApplications.length === 0 ? (
-                            <div className="p-3 text-sm text-muted-foreground text-center">
-                              Tidak ada aplikasi yang ditemukan
-                            </div>
-                          ) : (
-                            filteredApplications.map(app => (
-                              <div
-                                key={app.id}
-                                className={`p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0 ${
-                                  selectedApps.has(app.id) ? 'bg-primary/10' : ''
-                                }`}
-                                onClick={() => handleSelectApp(app.id)}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <div className="font-medium">{app.name}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {app.description || 'Tidak ada deskripsi'}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="text-xs">
-                                      {app.platform === 'mobile' ? '📱 Mobile' : '🌐 Website'}
-                                    </Badge>
-                                    <Badge variant="outline" className="text-xs">
-                                      {connectionStats[app.app_token] || 0} client
-                                    </Badge>
-                                    {selectedApps.has(app.id) && (
-                                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    <MultiSelect
+                      options={applications}
+                      selectedValues={selectedApps}
+                      onSelectionChange={setSelectedApps}
+                      placeholder="Pilih aplikasi untuk dikirim notifikasi..."
+                      searchPlaceholder="Cari aplikasi..."
+                      getOptionValue={(app) => app.id}
+                      getOptionLabel={(app) => `${app.platform === 'mobile' ? '📱' : '🌐'} ${app.name}`}
+                      getOptionDescription={(app) => app.description}
+                      getOptionBadge={(app) => `${connectionStats[app.app_token] || 0} client`}
+                      showSelectAll={true}
+                      showClearAll={true}
+                      className="w-full"
+                    />
                   </div>
 
                   <div className="grid gap-2">
@@ -429,13 +340,7 @@ export function SendNotificationPage() {
         </div>
       )}
 
-      {/* Click outside to close dropdown */}
-      {isDropdownOpen && (
-        <div 
-          className="fixed inset-0 z-40" 
-          onClick={() => setIsDropdownOpen(false)}
-        />
-      )}
+
     </div>
   );
 }

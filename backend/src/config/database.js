@@ -1,5 +1,6 @@
 const { Sequelize } = require("sequelize");
 require("dotenv").config();
+const logger = require("../utils/logger");
 
 // Database utama SelfiNotify
 const sequelize = new Sequelize(
@@ -52,16 +53,20 @@ const masterSequelize = new Sequelize(
 const connectDB = async () => {
   try {
     await sequelize.authenticate();
-    console.log(
+    logger.info(
       "Connection to SelfiNotify database has been established successfully."
     );
 
     await masterSequelize.authenticate();
-    console.log(
+    logger.info(
       "Connection to Master database has been established successfully."
     );
   } catch (error) {
-    console.error("Unable to connect to the database:", error);
+    logger.error(
+      "Unable to connect to the database",
+      error,
+      "Database.connectDB"
+    );
   }
 };
 

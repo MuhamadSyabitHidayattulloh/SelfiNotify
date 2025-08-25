@@ -61,7 +61,7 @@ export const applicationsAPI = {
 // Notifications API functions
 export const notificationsAPI = {
   send: (data) => api.post('/notifications/send', data),
-  bulkSend: (data) => api.post('/notifications/bulk-send', data),
+  bulkSend: (data) => api.post('/notifications/bulk-send', { data }),
   sendTest: (application_id) => api.post('/notifications/test', { application_id }),
   getHistory: (params = {}) => api.get('/notifications/history', { params }),
   getStats: () => api.get('/notifications/stats'),
@@ -69,6 +69,11 @@ export const notificationsAPI = {
   resend: (id) => api.post(`/notifications/${id}/resend`),
   delete: (id) => api.delete(`/notifications/${id}`),
   bulkDelete: (ids) => api.post('/notifications/bulk-delete', { ids }),
+};
+
+// Socket/Connection API functions
+export const socketAPI = {
+  getConnectionStats: () => api.get('/socket/connection-stats'),
 };
 
 export default api;

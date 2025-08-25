@@ -1,5 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { authAPI } from '../lib/api.jsx';
+import socketService from '../lib/socket.jsx';
 
 // Create Auth Context
 const AuthContext = createContext();
@@ -26,6 +27,10 @@ export function AuthProvider({ children }) {
         if (response.data.success) {
           setUser(response.data.data.user);
           setIsAuthenticated(true);
+          
+          // Connect socket service
+          socketService.connect();
+          socketService.connectDashboard(response.data.data.user.username);
         } else {
           // Token invalid, clear storage
           logout();
@@ -55,6 +60,10 @@ export function AuthProvider({ children }) {
         setUser(userData);
         setIsAuthenticated(true);
         
+        // Connect socket service
+        socketService.connect();
+        socketService.connectDashboard(userData.username);
+        
         return { success: true, user: userData };
       } else {
         return { success: false, message: response.data.message };
@@ -68,6 +77,9 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    // Disconnect socket service
+    socketService.disconnect();
+    
     // Clear storage
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');

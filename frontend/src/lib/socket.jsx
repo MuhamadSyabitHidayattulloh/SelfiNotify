@@ -5,6 +5,10 @@ class SocketService {
     this.socket = null;
     this.isConnected = false;
     this.listeners = new Map();
+    this.connectionStats = this.loadConnectionStats();
+    this.autoReconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
+    this.reconnectDelay = 1000;
   }
 
   connect(serverUrl = 'http://localhost:3000') {
@@ -15,6 +19,9 @@ class SocketService {
     this.socket = io(serverUrl, {
       transports: ["websocket"],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: this.reconnectDelay,
     });
 
     this.setupEventHandlers();
@@ -27,7 +34,11 @@ class SocketService {
     this.socket.on('connect', () => {
       console.log('Connected to server:', this.socket.id);
       this.isConnected = true;
+      this.autoReconnectAttempts = 0;
       this.emit('connection_status', { connected: true });
+      
+      // Request connection stats on reconnect
+      this.requestConnectionStats();
     });
 
     this.socket.on('disconnect', () => {
@@ -40,24 +51,65 @@ class SocketService {
       console.error('Connection error:', error);
       this.isConnected = false;
       this.emit('connection_error', error);
+      
+      // Attempt to reconnect
+      this.autoReconnectAttempts++;
+      if (this.autoReconnectAttempts < this.maxReconnectAttempts) {
+        setTimeout(() => {
+          this.connect();
+        }, this.reconnectDelay * this.autoReconnectAttempts);
+      }
     });
 
     // Dashboard specific events
-    this.socket.on('dashboard:client_connected', (data) => {
-      this.emit('client_connected', data);
-    });
-
-    this.socket.on('dashboard:client_disconnected', (data) => {
-      this.emit('client_disconnected', data);
-    });
-
     this.socket.on('dashboard:notification_sent', (data) => {
       this.emit('notification_sent', data);
     });
 
     this.socket.on('connection_stats', (data) => {
+      this.updateConnectionStats(data);
       this.emit('connection_stats', data);
     });
+  }
+
+  // Update connection stats and save to localStorage
+  updateConnectionStats(data) {
+    if (data.apps) {
+      this.connectionStats = { ...this.connectionStats, ...data.apps };
+      this.saveConnectionStats();
+    }
+  }
+
+  // Save connection stats to localStorage
+  saveConnectionStats() {
+    try {
+      localStorage.setItem('connection_stats', JSON.stringify(this.connectionStats));
+    } catch (error) {
+      console.error('Failed to save connection stats:', error);
+    }
+  }
+
+  // Load connection stats from localStorage
+  loadConnectionStats() {
+    try {
+      const stats = localStorage.getItem('connection_stats');
+      return stats ? JSON.parse(stats) : {};
+    } catch (error) {
+      console.error('Failed to load connection stats:', error);
+      return {};
+    }
+  }
+
+  // Get current connection stats
+  getConnectionStats() {
+    return this.connectionStats;
+  }
+
+  // Request connection stats from server
+  requestConnectionStats() {
+    if (this.socket && this.isConnected) {
+      this.socket.emit('request_connection_stats');
+    }
   }
 
   // Connect dashboard to receive real-time updates

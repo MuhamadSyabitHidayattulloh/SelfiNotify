@@ -1,21 +1,22 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { History, Bell, Repeat, Trash2, Search, Smartphone, CheckSquare, Square, Trash2 as BulkTrash } from 'lucide-react';
 import { useToast } from '../components/ui/toast';
+import { useAuth } from '../hooks/useAuth';
 import { notificationsAPI, applicationsAPI } from '../lib/api.jsx';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
 import { Badge } from '../components/ui/badge';
+import { MultiSelect } from '../components/ui/multi-select';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '../components/ui/alert-dialog';
 
 export function HistoryPage() {
   const [notifications, setNotifications] = useState([]);
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedApp, setSelectedApp] = useState('all');
+  const [selectedApps, setSelectedApps] = useState(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [notificationToDelete, setNotificationToDelete] = useState(null);
@@ -28,10 +29,11 @@ export function HistoryPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadData();
-  }, [selectedApp]); // Reload when selectedApp changes
+  }, [selectedApps]); // Reload when selectedApps changes
 
   const loadData = async () => {
     setLoading(true);
@@ -44,8 +46,8 @@ export function HistoryPage() {
 
       // Load notifications
       const params = {};
-      if (selectedApp !== 'all') {
-        params.application_id = selectedApp;
+      if (selectedApps.size > 0) {
+        params.application_ids = Array.from(selectedApps);
       }
       const historyResponse = await notificationsAPI.getHistory(params);
       if (historyResponse.data.success) {
@@ -184,23 +186,24 @@ export function HistoryPage() {
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Application Filter */}
-              <div className="sm:w-48">
+              <div className="sm:w-80">
                 <Label htmlFor="app-filter" className="text-sm font-medium mb-2 block">
                   Filter Aplikasi
                 </Label>
-                <Select value={selectedApp} onValueChange={setSelectedApp}>
-                  <SelectTrigger id="app-filter">
-                    <SelectValue placeholder="Semua Aplikasi" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua Aplikasi</SelectItem>
-                    {applications.map(app => (
-                      <SelectItem key={app.id} value={app.id.toString()}>
-                        {app.platform === 'mobile' ? '📱' : '🌐'} {app.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelect
+                  options={applications}
+                  selectedValues={selectedApps}
+                  onSelectionChange={setSelectedApps}
+                  placeholder="Pilih aplikasi untuk filter..."
+                  searchPlaceholder="Cari aplikasi..."
+                  getOptionValue={(app) => app.id.toString()}
+                  getOptionLabel={(app) => `${app.platform === 'mobile' ? '📱' : '🌐'} ${app.name}`}
+                  getOptionDescription={(app) => app.description}
+                  getOptionBadge={(app) => app.platform === 'mobile' ? '📱 Mobile' : '🌐 Website'}
+                  showSelectAll={true}
+                  showClearAll={true}
+                  className="w-full"
+                />
               </div>
               
               {/* Search Input */}
@@ -227,19 +230,23 @@ export function HistoryPage() {
             </div>
             
             {/* Filter Summary */}
-            {(searchTerm || selectedApp !== 'all') && (
+            {(searchTerm || selectedApps.size > 0) && (
               <div className="flex items-center gap-2 mt-4 pt-4 border-t">
                 <span className="text-sm text-muted-foreground">
                   Menampilkan {filteredNotifications.length} dari {notifications.length} notifikasi
                   {debouncedSearchTerm && ` untuk pencarian "${debouncedSearchTerm}"`}
-                  {selectedApp !== 'all' && ` pada aplikasi ${applications.find(app => app.id.toString() === selectedApp)?.name}`}
+                  {selectedApps.size > 0 && (
+                    selectedApps.size === 1 
+                      ? ` pada aplikasi ${applications.find(app => app.id.toString() === Array.from(selectedApps)[0])?.name}`
+                      : ` pada ${selectedApps.size} aplikasi`
+                  )}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => {
                     setSearchTerm('');
-                    setSelectedApp('all');
+                    setSelectedApps(new Set());
                     setSelectedNotifications(new Set());
                   }}
                   className="h-6 px-2 text-xs"
@@ -255,7 +262,7 @@ export function HistoryPage() {
       {filteredNotifications.length === 0 ? (
         <Card className="text-center py-12">
           <CardContent>
-            {debouncedSearchTerm || selectedApp !== 'all' ? (
+            {debouncedSearchTerm || selectedApps.size > 0 ? (
               <>
                 <Search className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
                 <p className="text-lg text-muted-foreground mb-4">
@@ -265,7 +272,7 @@ export function HistoryPage() {
                   variant="outline"
                   onClick={() => {
                     setSearchTerm('');
-                    setSelectedApp('all');
+                    setSelectedApps(new Set());
                     setSelectedNotifications(new Set());
                   }}
                 >

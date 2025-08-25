@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user.model");
 const config = require("../config");
+const logger = require("../utils/logger");
 
 class AuthController {
   /**
@@ -64,7 +65,7 @@ class AuthController {
         },
       });
     } catch (error) {
-      console.error("Login error:", error);
+      logger.error("Login error", error, "AuthController.login");
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
