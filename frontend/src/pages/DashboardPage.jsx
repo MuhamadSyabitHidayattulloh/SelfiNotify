@@ -280,7 +280,7 @@ export function DashboardPage() {
                   Belum ada notifikasi yang dikirim
                 </p>
                 <Button asChild size="sm">
-                  <Link to="/applications">
+                  <Link to="/send-notification">
                     Kirim Notifikasi Pertama
                   </Link>
                 </Button>

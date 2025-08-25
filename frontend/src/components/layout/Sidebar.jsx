@@ -78,13 +78,14 @@ export function Sidebar({ className }) {
         className={cn(
           'fixed left-0 top-0 z-40 h-full bg-sidebar border-r border-sidebar-border transition-all duration-300',
           'md:relative md:translate-x-0',
+          'flex flex-col', // Tambahkan flex flex-col
           isCollapsed ? 'w-16' : 'w-64',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
           className
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
+        <div className="flex items-center justify-between p-4 border-b border-sidebar-border flex-shrink-0">
           <div className={cn(
             'flex items-center gap-3 transition-opacity duration-200',
             isCollapsed && 'opacity-0 md:opacity-100'
@@ -112,7 +113,7 @@ export function Sidebar({ className }) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-4">
+        <nav className="flex-1 p-4 overflow-y-auto">
           <ul className="space-y-2">
             {navigation.map((item) => {
               const isActive = location.pathname === item.href;
@@ -143,7 +144,7 @@ export function Sidebar({ className }) {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-4 border-t border-sidebar-border flex-shrink-0 mt-auto">
           <div className={cn(
             'text-xs text-sidebar-foreground/60 text-center transition-opacity duration-200',
             isCollapsed && 'opacity-0 md:opacity-100'
@@ -151,7 +152,7 @@ export function Sidebar({ className }) {
             {!isCollapsed && (
               <>
                 <p>SelfiNotify v1.0.0</p>
-                <p className="mt-1">© 2024 MuhamadSyabitHidayattulloh</p>
+                {/* <p className="mt-1">© 2024 MuhamadSyabitHidayattulloh</p> */}
               </>
             )}
           </div>
