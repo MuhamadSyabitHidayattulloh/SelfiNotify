@@ -1,4 +1,4 @@
-const NotificationHistory = require("../models/notification.model"); // Changed from NotificationModel
+const Notification = require("../models/notification.model"); // Changed from NotificationModel
 const Application = require("../models/application.model"); // Changed from ApplicationModel
 const { Op } = require("sequelize");
 
@@ -35,12 +35,11 @@ class NotificationController {
       }
 
       // Create notification record
-      const notification = await NotificationHistory.create({
+      const notification = await Notification.create({
         application_id,
         title: title.trim(),
         message: message.trim(),
         file_url: file_url ? file_url.trim() : null,
-        status: "SENT",
       });
 
       // TODO: Send notification via WebSocket
@@ -92,26 +91,29 @@ class NotificationController {
         whereClause.application_id = application_id;
       }
 
-      const notifications = await NotificationHistory.findAll({
+      const notifications = await Notification.findAll({
         where: whereClause,
-        include: [{
-          model: Application,
-          attributes: ["name"],
-        }],
+        include: [
+          {
+            model: Application,
+            attributes: ["name"],
+          },
+        ],
         order: [["sent_at", "DESC"]],
         limit: parseInt(limit),
         offset: parseInt(offset),
       });
 
-      const formattedNotifications = notifications.map(notification => ({
+      const formattedNotifications = notifications.map((notification) => ({
         id: notification.id,
         application_id: notification.application_id,
         title: notification.title,
         message: notification.message,
         file_url: notification.file_url,
-        status: notification.status,
         sent_at: notification.sent_at,
-        application_name: notification.Application ? notification.Application.name : null,
+        application_name: notification.Application
+          ? notification.Application.name
+          : null,
       }));
 
       res.json({
@@ -136,11 +138,13 @@ class NotificationController {
     try {
       const { id } = req.params;
 
-      const notification = await NotificationHistory.findByPk(id, {
-        include: [{
-          model: Application,
-          attributes: ["name"],
-        }],
+      const notification = await Notification.findByPk(id, {
+        include: [
+          {
+            model: Application,
+            attributes: ["name"],
+          },
+        ],
       });
       if (!notification) {
         return res.status(404).json({
@@ -158,9 +162,10 @@ class NotificationController {
             title: notification.title,
             message: notification.message,
             file_url: notification.file_url,
-            status: notification.status,
             sent_at: notification.sent_at,
-            application_name: notification.Application ? notification.Application.name : null,
+            application_name: notification.Application
+              ? notification.Application.name
+              : null,
           },
         },
       });
@@ -180,7 +185,7 @@ class NotificationController {
     try {
       const { id } = req.params;
 
-      const notification = await NotificationHistory.findByPk(id);
+      const notification = await Notification.findByPk(id);
       if (!notification) {
         return res.status(404).json({
           success: false,
@@ -200,12 +205,11 @@ class NotificationController {
       }
 
       // Create new notification record
-      const newNotification = await NotificationHistory.create({
+      const newNotification = await Notification.create({
         application_id: notification.application_id,
         title: notification.title,
         message: notification.message,
         file_url: notification.file_url,
-        status: "SENT",
       });
 
       // Send notification via WebSocket
@@ -253,12 +257,11 @@ class NotificationController {
       }
 
       // Create test notification record
-      const notification = await NotificationHistory.create({
+      const notification = await Notification.create({
         application_id,
         title: "Test Notification",
         message: `Ini adalah notifikasi test untuk aplikasi "${application.name}". Jika Anda menerima pesan ini, berarti koneksi WebSocket berfungsi dengan baik.`,
         file_url: null,
-        status: "SENT",
       });
 
       // Send test notification via WebSocket
@@ -295,20 +298,14 @@ class NotificationController {
    */
   static async getStats(req, res) {
     try {
-      const total_notifications = await NotificationHistory.count();
-      const today_notifications = await NotificationHistory.count({
+      const total_notifications = await Notification.count();
+      const today_notifications = await Notification.count({
         where: {
           sent_at: {
             [Op.gte]: new Date(new Date().setHours(0, 0, 0, 0)),
             [Op.lt]: new Date(new Date().setHours(24, 0, 0, 0)),
           },
         },
-      });
-      const sent_notifications = await NotificationHistory.count({
-        where: { status: "SENT" },
-      });
-      const failed_notifications = await NotificationHistory.count({
-        where: { status: "FAILED" },
       });
 
       res.json({
@@ -317,8 +314,6 @@ class NotificationController {
           stats: {
             total_notifications,
             today_notifications,
-            sent_notifications,
-            failed_notifications,
           },
         },
       });
@@ -338,7 +333,7 @@ class NotificationController {
     try {
       const { id } = req.params;
 
-      const deletedCount = await NotificationHistory.destroy({
+      const deletedCount = await Notification.destroy({
         where: { id },
       });
       if (deletedCount === 0) {
@@ -367,25 +362,28 @@ class NotificationController {
   static async getAll(req, res) {
     try {
       const { limit = 100, offset = 0 } = req.query;
-      const notifications = await NotificationHistory.findAll({
-        include: [{
-          model: Application,
-          attributes: ["name"],
-        }],
+      const notifications = await Notification.findAll({
+        include: [
+          {
+            model: Application,
+            attributes: ["name"],
+          },
+        ],
         order: [["sent_at", "DESC"]],
         limit: parseInt(limit),
         offset: parseInt(offset),
       });
 
-      const formattedNotifications = notifications.map(notification => ({
+      const formattedNotifications = notifications.map((notification) => ({
         id: notification.id,
         application_id: notification.application_id,
         title: notification.title,
         message: notification.message,
         file_url: notification.file_url,
-        status: notification.status,
         sent_at: notification.sent_at,
-        application_name: notification.Application ? notification.Application.name : null,
+        application_name: notification.Application
+          ? notification.Application.name
+          : null,
       }));
 
       res.json({
@@ -426,7 +424,7 @@ class NotificationController {
       }
 
       // Delete notifications
-      const deletedCount = await NotificationHistory.destroy({
+      const deletedCount = await Notification.destroy({
         where: {
           id: ids,
         },
@@ -512,11 +510,10 @@ class NotificationController {
         title: title.trim(),
         message: message.trim(),
         file_url: file_url ? file_url.trim() : null,
-        status: "SENT",
       }));
 
       // Create notification records
-      const createdNotifications = await NotificationHistory.bulkCreate(
+      const createdNotifications = await Notification.bulkCreate(
         notificationsData
       );
 
@@ -557,5 +554,3 @@ class NotificationController {
 }
 
 module.exports = NotificationController;
-
-
