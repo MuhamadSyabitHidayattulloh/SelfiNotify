@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { History, Bell, Repeat, Trash2, Search, Smartphone, CheckSquare, Square, Trash2 as BulkTrash } from 'lucide-react';
+import { History, Bell, Repeat, Trash2, Search, Smartphone, CheckSquare, Square, Trash2 as BulkTrash, AlertCircle, CheckCircle, Clock, XCircle } from 'lucide-react';
 import { useToast } from '../components/ui/toast';
 import { useAuth } from '../hooks/useAuth';
 import { notificationsAPI, applicationsAPI } from '../lib/api.jsx';
@@ -163,6 +163,40 @@ export function HistoryPage() {
     notification.application_name.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
   );
 
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'sent':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'delivered':
+        return <CheckCircle className="h-4 w-4 text-blue-500" />;
+      case 'pending':
+        return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'queued':
+        return <Clock className="h-4 w-4 text-orange-500" />;
+      case 'failed':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getStatusBadgeVariant = (status) => {
+    switch (status) {
+      case 'sent':
+        return 'default';
+      case 'delivered':
+        return 'default';
+      case 'pending':
+        return 'secondary';
+      case 'queued':
+        return 'secondary';
+      case 'failed':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -211,21 +245,21 @@ export function HistoryPage() {
                 <Label htmlFor="search-term" className="text-sm font-medium mb-2 block">
                   Cari Notifikasi
                 </Label>
-                                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="search-term"
-                      placeholder="Cari judul, pesan, atau nama aplikasi..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9"
-                    />
-                    {searchTerm !== debouncedSearchTerm && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <LoadingSpinner size="sm" />
-                      </div>
-                    )}
-                  </div>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="search-term"
+                    placeholder="Cari judul, pesan, atau nama aplikasi..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                  {searchTerm !== debouncedSearchTerm && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <LoadingSpinner size="sm" />
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             
@@ -336,7 +370,10 @@ export function HistoryPage() {
                       )}
                     </Button>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{notification.title}</p>
+                      <div className="flex items-center gap-2 mb-1">
+                        {getStatusIcon(notification.status)}
+                        <p className="text-sm font-medium truncate">{notification.title}</p>
+                      </div>
                       <p className="text-muted-foreground text-xs mt-1">{notification.message}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -355,7 +392,7 @@ export function HistoryPage() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 ml-4">
-                    <Badge variant={notification.status === 'SENT' ? 'default' : 'secondary'}>
+                    <Badge variant={getStatusBadgeVariant(notification.status)}>
                       {notification.status}
                     </Badge>
                     <div className="flex gap-1">
@@ -448,7 +485,7 @@ export function HistoryPage() {
             <AlertDialogCancel disabled={isBulkDeleting}>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={handleBulkDelete} disabled={isBulkDeleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {isBulkDeleting ? (
-                <><LoadingSpinner size="sm" className="mr-2" /> Menghapus...</>
+                <><LoadingSpinner size="sm" className="mr-2" /> `Hapus ${selectedNotifications.size} Notifikasi`</>
               ) : (
                 `Hapus ${selectedNotifications.size} Notifikasi`
               )}

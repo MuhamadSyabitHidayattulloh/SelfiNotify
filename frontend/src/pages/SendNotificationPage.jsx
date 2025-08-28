@@ -42,8 +42,6 @@ export function SendNotificationPage() {
     }
   };
 
-
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -339,8 +337,6 @@ export function SendNotificationPage() {
           </div>
         </div>
       )}
-
-
     </div>
   );
 }

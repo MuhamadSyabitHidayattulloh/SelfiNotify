@@ -7,7 +7,11 @@ import {
   Users, 
   TrendingUp,
   Activity,
-  Send
+  Send,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  XCircle
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../components/ui/toast';
@@ -17,6 +21,7 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { LoadingSpinner } from '../components/ui/loading-spinner';
+import { Alert, AlertDescription } from '../components/ui/alert';
 
 export function DashboardPage() {
   const { user } = useAuth();
@@ -32,6 +37,7 @@ export function DashboardPage() {
   const [recentNotifications, setRecentNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [connectionStats, setConnectionStats] = useState({});
+  const [queueStats, setQueueStats] = useState(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -97,6 +103,7 @@ export function DashboardPage() {
           total_notifications: notifStats.total_notifications || 0,
           today_notifications: notifStats.today_notifications || 0
         }));
+        setQueueStats(notifStats.queue);
       }
 
       // Load recent notifications
@@ -110,6 +117,40 @@ export function DashboardPage() {
       toast.error('Error', 'Gagal memuat data dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'sent':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'delivered':
+        return <CheckCircle className="h-4 w-4 text-blue-500" />;
+      case 'pending':
+        return <Clock className="h-4 w-4 text-yellow-500" />;
+      case 'queued':
+        return <Clock className="h-4 w-4 text-orange-500" />;
+      case 'failed':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <AlertCircle className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getStatusBadgeVariant = (status) => {
+    switch (status) {
+      case 'sent':
+        return 'default';
+      case 'delivered':
+        return 'default';
+      case 'pending':
+        return 'secondary';
+      case 'queued':
+        return 'secondary';
+      case 'failed':
+        return 'destructive';
+      default:
+        return 'outline';
     }
   };
 
@@ -188,6 +229,45 @@ export function DashboardPage() {
         </Card>
       </div>
 
+      {/* Queue Status */}
+      {queueStats && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Status Antrean Notifikasi
+            </CardTitle>
+            <CardDescription>
+              Monitor status pengiriman notifikasi real-time
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold text-blue-600">{queueStats.waiting}</div>
+                <p className="text-xs text-muted-foreground">Menunggu</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">{queueStats.active}</div>
+                <p className="text-xs text-muted-foreground">Sedang Diproses</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-green-600">{queueStats.completed}</div>
+                <p className="text-xs text-muted-foreground">Selesai</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">{queueStats.failed}</div>
+                <p className="text-xs text-muted-foreground">Gagal</p>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-purple-600">{queueStats.delayed}</div>
+                <p className="text-xs text-muted-foreground">Tertunda</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Quick Actions */}
       <Card>
         <CardHeader>
@@ -205,9 +285,15 @@ export function DashboardPage() {
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link to="/history" className="flex items-center gap-2">
+              <Link to="/send-notification" className="flex items-center gap-2">
                 <Send className="h-4 w-4" />
                 Kirim Notifikasi
+              </Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/history" className="flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Lihat Riwayat
               </Link>
             </Button>
           </div>
@@ -292,7 +378,10 @@ export function DashboardPage() {
                   <div key={notification.id} className="p-3 border rounded-lg">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{notification.title}</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          {getStatusIcon(notification.status)}
+                          <p className="font-medium truncate">{notification.title}</p>
+                        </div>
                         <p className="text-sm text-muted-foreground truncate">
                           {notification.message}
                         </p>
@@ -300,7 +389,7 @@ export function DashboardPage() {
                           {notification.application_name} • {new Date(notification.sent_at).toLocaleString('id-ID')}
                         </p>
                       </div>
-                      <Badge variant="outline" className="ml-2">
+                      <Badge variant={getStatusBadgeVariant(notification.status)} className="ml-2">
                         {notification.status}
                       </Badge>
                     </div>

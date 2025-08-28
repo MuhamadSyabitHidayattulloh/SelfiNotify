@@ -1,6 +1,8 @@
-const Notification = require("../models/notification.model"); // Changed from NotificationModel
-const Application = require("../models/application.model"); // Changed from ApplicationModel
+const Notification = require("../models/notification.model");
+const Application = require("../models/application.model");
 const { Op } = require("sequelize");
+const queueService = require("../services/queue.service");
+const logger = require("../utils/logger");
 
 class NotificationController {
   /**
@@ -26,7 +28,7 @@ class NotificationController {
       }
 
       // Check if application exists
-      const application = await Application.findByPk(application_id); // Using Sequelize findByPk
+      const application = await Application.findByPk(application_id);
       if (!application) {
         return res.status(404).json({
           success: false,
@@ -34,36 +36,80 @@ class NotificationController {
         });
       }
 
-      // Create notification record
+      // Create notification record with pending status
       const notification = await Notification.create({
         application_id,
         title: title.trim(),
         message: message.trim(),
         file_url: file_url ? file_url.trim() : null,
+        status: "pending",
       });
 
-      // TODO: Send notification via WebSocket
-      // This will be implemented in the WebSocket service
-      const io = req.app.get("io");
-      if (io) {
-        io.to(application.app_token).emit("notification", {
-          id: notification.id,
+      // Add notification to queue instead of sending directly
+      try {
+        const queueResult = await queueService.addNotificationToQueue({
+          notificationId: notification.id,
+          applicationId: application.id,
+          appToken: application.app_token,
           title: notification.title,
           message: notification.message,
-          file_url: notification.file_url,
-          sent_at: new Date().toISOString(),
+          fileUrl: notification.file_url,
+        });
+
+        // Update notification status to queued
+        await notification.update({ status: "queued" });
+
+        logger.info(
+          `Notification ${notification.id} queued successfully:`,
+          queueResult
+        );
+
+        res.status(201).json({
+          success: true,
+          message: "Notifikasi berhasil ditambahkan ke antrean",
+          data: {
+            notification: {
+              id: notification.id,
+              title: notification.title,
+              message: notification.message,
+              file_url: notification.file_url,
+              status: notification.status,
+              sent_at: notification.sent_at,
+            },
+            queue: queueResult,
+          },
+        });
+      } catch (queueError) {
+        logger.error(
+          `Failed to queue notification ${notification.id}:`,
+          queueError
+        );
+
+        // Update notification status to failed
+        await notification.update({
+          status: "failed",
+          delivery_attempts: 1,
+          last_delivery_attempt: new Date(),
+        });
+
+        res.status(500).json({
+          success: false,
+          message:
+            "Notifikasi berhasil disimpan tapi gagal ditambahkan ke antrean",
+          data: {
+            notification: {
+              id: notification.id,
+              title: notification.title,
+              message: notification.message,
+              file_url: notification.file_url,
+              status: notification.status,
+            },
+            error: "Queue service unavailable",
+          },
         });
       }
-
-      res.status(201).json({
-        success: true,
-        message: "Notifikasi berhasil dikirim",
-        data: {
-          notification,
-        },
-      });
     } catch (error) {
-      console.error("Send notification error:", error);
+      logger.error("Send notification error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
@@ -76,12 +122,12 @@ class NotificationController {
    */
   static async getHistory(req, res) {
     try {
-      const { limit = 50, offset = 0, application_id } = req.query;
+      const { limit = 50, offset = 0, application_id, status } = req.query;
 
       let whereClause = {};
       if (application_id) {
         // Check if application exists
-        const application = await Application.findByPk(application_id); // Using Sequelize findByPk
+        const application = await Application.findByPk(application_id);
         if (!application) {
           return res.status(404).json({
             success: false,
@@ -89,6 +135,10 @@ class NotificationController {
           });
         }
         whereClause.application_id = application_id;
+      }
+
+      if (status) {
+        whereClause.status = status;
       }
 
       const notifications = await Notification.findAll({
@@ -110,7 +160,12 @@ class NotificationController {
         title: notification.title,
         message: notification.message,
         file_url: notification.file_url,
+        status: notification.status,
+        delivery_attempts: notification.delivery_attempts,
+        max_retries: notification.max_retries,
+        last_delivery_attempt: notification.last_delivery_attempt,
         sent_at: notification.sent_at,
+        delivered_at: notification.delivered_at,
         application_name: notification.Application
           ? notification.Application.name
           : null,
@@ -123,7 +178,7 @@ class NotificationController {
         },
       });
     } catch (error) {
-      console.error("Get notification history error:", error);
+      logger.error("Get notification history error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
@@ -162,7 +217,12 @@ class NotificationController {
             title: notification.title,
             message: notification.message,
             file_url: notification.file_url,
+            status: notification.status,
+            delivery_attempts: notification.delivery_attempts,
+            max_retries: notification.max_retries,
+            last_delivery_attempt: notification.last_delivery_attempt,
             sent_at: notification.sent_at,
+            delivered_at: notification.delivered_at,
             application_name: notification.Application
               ? notification.Application.name
               : null,
@@ -170,7 +230,7 @@ class NotificationController {
         },
       });
     } catch (error) {
-      console.error("Get notification by ID error:", error);
+      logger.error("Get notification by ID error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
@@ -210,29 +270,69 @@ class NotificationController {
         title: notification.title,
         message: notification.message,
         file_url: notification.file_url,
+        status: "pending",
       });
 
-      // Send notification via WebSocket
-      const io = req.app.get("io");
-      if (io) {
-        io.to(application.app_token).emit("notification", {
-          id: newNotification.id,
+      // Add to queue instead of sending directly
+      try {
+        const queueResult = await queueService.addNotificationToQueue({
+          notificationId: newNotification.id,
+          applicationId: application.id,
+          appToken: application.app_token,
           title: newNotification.title,
           message: newNotification.message,
-          file_url: newNotification.file_url,
-          sent_at: new Date().toISOString(),
+          fileUrl: newNotification.file_url,
+        });
+
+        // Update notification status to queued
+        await newNotification.update({ status: "queued" });
+
+        res.json({
+          success: true,
+          message:
+            "Notifikasi berhasil ditambahkan ke antrean untuk dikirim ulang",
+          data: {
+            notification: {
+              id: newNotification.id,
+              title: newNotification.title,
+              message: newNotification.message,
+              file_url: newNotification.file_url,
+              status: newNotification.status,
+            },
+            queue: queueResult,
+          },
+        });
+      } catch (queueError) {
+        logger.error(
+          `Failed to queue resend notification ${newNotification.id}:`,
+          queueError
+        );
+
+        // Update notification status to failed
+        await newNotification.update({
+          status: "failed",
+          delivery_attempts: 1,
+          last_delivery_attempt: new Date(),
+        });
+
+        res.status(500).json({
+          success: false,
+          message:
+            "Notifikasi berhasil dibuat tapi gagal ditambahkan ke antrean",
+          data: {
+            notification: {
+              id: newNotification.id,
+              title: newNotification.title,
+              message: newNotification.message,
+              file_url: newNotification.file_url,
+              status: newNotification.status,
+            },
+            error: "Queue service unavailable",
+          },
         });
       }
-
-      res.json({
-        success: true,
-        message: "Notifikasi berhasil dikirim ulang",
-        data: {
-          notification: newNotification,
-        },
-      });
     } catch (error) {
-      console.error("Resend notification error:", error);
+      logger.error("Resend notification error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
@@ -262,30 +362,68 @@ class NotificationController {
         title: "Test Notification",
         message: `Ini adalah notifikasi test untuk aplikasi "${application.name}". Jika Anda menerima pesan ini, berarti koneksi WebSocket berfungsi dengan baik.`,
         file_url: null,
+        status: "pending",
       });
 
-      // Send test notification via WebSocket
-      const io = req.app.get("io");
-      if (io) {
-        io.to(application.app_token).emit("notification", {
-          id: notification.id,
+      // Add to queue instead of sending directly
+      try {
+        const queueResult = await queueService.addNotificationToQueue({
+          notificationId: notification.id,
+          applicationId: application.id,
+          appToken: application.app_token,
           title: notification.title,
           message: notification.message,
-          file_url: notification.file_url,
-          sent_at: new Date().toISOString(),
-          is_test: true,
+          fileUrl: notification.file_url,
+        });
+
+        // Update notification status to queued
+        await notification.update({ status: "queued" });
+
+        res.json({
+          success: true,
+          message: "Notifikasi test berhasil ditambahkan ke antrean",
+          data: {
+            notification: {
+              id: notification.id,
+              title: notification.title,
+              message: notification.message,
+              file_url: notification.file_url,
+              status: notification.status,
+            },
+            queue: queueResult,
+          },
+        });
+      } catch (queueError) {
+        logger.error(
+          `Failed to queue test notification ${notification.id}:`,
+          queueError
+        );
+
+        // Update notification status to failed
+        await notification.update({
+          status: "failed",
+          delivery_attempts: 1,
+          last_delivery_attempt: new Date(),
+        });
+
+        res.status(500).json({
+          success: false,
+          message:
+            "Notifikasi test berhasil dibuat tapi gagal ditambahkan ke antrean",
+          data: {
+            notification: {
+              id: notification.id,
+              title: notification.title,
+              message: notification.message,
+              file_url: notification.file_url,
+              status: notification.status,
+            },
+            error: "Queue service unavailable",
+          },
         });
       }
-
-      res.json({
-        success: true,
-        message: "Notifikasi test berhasil dikirim",
-        data: {
-          notification,
-        },
-      });
     } catch (error) {
-      console.error("Send test notification error:", error);
+      logger.error("Send test notification error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
@@ -308,17 +446,45 @@ class NotificationController {
         },
       });
 
+      // Get status-based statistics
+      const pending_count = await Notification.count({
+        where: { status: "pending" },
+      });
+      const queued_count = await Notification.count({
+        where: { status: "queued" },
+      });
+      const sent_count = await Notification.count({
+        where: { status: "sent" },
+      });
+      const delivered_count = await Notification.count({
+        where: { status: "delivered" },
+      });
+      const failed_count = await Notification.count({
+        where: { status: "failed" },
+      });
+
+      // Get queue statistics
+      const queueStats = await queueService.getQueueStats();
+
       res.json({
         success: true,
         data: {
           stats: {
             total_notifications,
             today_notifications,
+            by_status: {
+              pending: pending_count,
+              queued: queued_count,
+              sent: sent_count,
+              delivered: delivered_count,
+              failed: failed_count,
+            },
+            queue: queueStats,
           },
         },
       });
     } catch (error) {
-      console.error("Get notification stats error:", error);
+      logger.error("Get notification stats error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
@@ -348,7 +514,7 @@ class NotificationController {
         message: "Notifikasi berhasil dihapus",
       });
     } catch (error) {
-      console.error("Delete notification error:", error);
+      logger.error("Delete notification error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
@@ -361,8 +527,15 @@ class NotificationController {
    */
   static async getAll(req, res) {
     try {
-      const { limit = 100, offset = 0 } = req.query;
+      const { limit = 100, offset = 0, status } = req.query;
+
+      let whereClause = {};
+      if (status) {
+        whereClause.status = status;
+      }
+
       const notifications = await Notification.findAll({
+        where: whereClause,
         include: [
           {
             model: Application,
@@ -380,7 +553,12 @@ class NotificationController {
         title: notification.title,
         message: notification.message,
         file_url: notification.file_url,
+        status: notification.status,
+        delivery_attempts: notification.delivery_attempts,
+        max_retries: notification.max_retries,
+        last_delivery_attempt: notification.last_delivery_attempt,
         sent_at: notification.sent_at,
+        delivered_at: notification.delivered_at,
         application_name: notification.Application
           ? notification.Application.name
           : null,
@@ -393,7 +571,7 @@ class NotificationController {
         },
       });
     } catch (error) {
-      console.error("Get all notifications error:", error);
+      logger.error("Get all notifications error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
@@ -438,7 +616,7 @@ class NotificationController {
         },
       });
     } catch (error) {
-      console.error("Bulk delete notifications error:", error);
+      logger.error("Bulk delete notifications error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",
@@ -510,6 +688,7 @@ class NotificationController {
         title: title.trim(),
         message: message.trim(),
         file_url: file_url ? file_url.trim() : null,
+        status: "pending",
       }));
 
       // Create notification records
@@ -517,34 +696,162 @@ class NotificationController {
         notificationsData
       );
 
-      // Send notifications via WebSocket
-      const io = req.app.get("io");
-      if (io) {
-        for (const notification of createdNotifications) {
-          const application = applicationChecks.find(
-            (app) => app.id === notification.application_id
-          );
-          if (application) {
-            io.to(application.app_token).emit("notification", {
-              id: notification.id,
+      // Add all notifications to queue
+      const queueResults = [];
+      for (const notification of createdNotifications) {
+        const application = applicationChecks.find(
+          (app) => app.id === notification.application_id
+        );
+
+        if (application) {
+          try {
+            const queueResult = await queueService.addNotificationToQueue({
+              notificationId: notification.id,
+              applicationId: application.id,
+              appToken: application.app_token,
               title: notification.title,
               message: notification.message,
-              file_url: notification.file_url,
-              sent_at: new Date().toISOString(),
+              fileUrl: notification.file_url,
+            });
+
+            // Update notification status to queued
+            await notification.update({ status: "queued" });
+
+            queueResults.push({
+              notificationId: notification.id,
+              success: true,
+              queue: queueResult,
+            });
+          } catch (queueError) {
+            logger.error(
+              `Failed to queue notification ${notification.id}:`,
+              queueError
+            );
+
+            // Update notification status to failed
+            await notification.update({
+              status: "failed",
+              delivery_attempts: 1,
+              last_delivery_attempt: new Date(),
+            });
+
+            queueResults.push({
+              notificationId: notification.id,
+              success: false,
+              error: "Queue service unavailable",
             });
           }
         }
       }
 
+      const successfulCount = queueResults.filter((r) => r.success).length;
+      const failedCount = queueResults.length - successfulCount;
+
       res.status(201).json({
         success: true,
-        message: `${createdNotifications.length} notifikasi berhasil dikirim`,
+        message: `${successfulCount} notifikasi berhasil ditambahkan ke antrean, ${failedCount} gagal`,
         data: {
-          notifications: createdNotifications,
+          notifications: createdNotifications.map((n) => ({
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            file_url: n.file_url,
+            status: n.status,
+          })),
+          queue_results: queueResults,
         },
       });
     } catch (error) {
-      console.error("Bulk send notifications error:", error);
+      logger.error("Bulk send notifications error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Terjadi kesalahan server",
+      });
+    }
+  }
+
+  /**
+   * Retry failed notifications
+   */
+  static async retryFailed(req, res) {
+    try {
+      const { application_id } = req.query;
+
+      let whereClause = { status: "failed" };
+      if (application_id) {
+        whereClause.application_id = application_id;
+      }
+
+      // Get failed notifications
+      const failedNotifications = await Notification.findAll({
+        where: whereClause,
+        include: [
+          {
+            model: Application,
+            attributes: ["name", "app_token"],
+          },
+        ],
+      });
+
+      if (failedNotifications.length === 0) {
+        return res.json({
+          success: true,
+          message: "Tidak ada notifikasi yang gagal untuk di-retry",
+          data: { retried_count: 0 },
+        });
+      }
+
+      // Retry each failed notification
+      const retryResults = [];
+      for (const notification of failedNotifications) {
+        try {
+          const queueResult = await queueService.addNotificationToQueue({
+            notificationId: notification.id,
+            applicationId: notification.application_id,
+            appToken: notification.Application.app_token,
+            title: notification.title,
+            message: notification.message,
+            fileUrl: notification.file_url,
+          });
+
+          // Update notification status to queued
+          await notification.update({
+            status: "queued",
+            delivery_attempts: 0, // Reset delivery attempts
+            last_delivery_attempt: null,
+          });
+
+          retryResults.push({
+            notificationId: notification.id,
+            success: true,
+            queue: queueResult,
+          });
+        } catch (queueError) {
+          logger.error(
+            `Failed to retry notification ${notification.id}:`,
+            queueError
+          );
+
+          retryResults.push({
+            notificationId: notification.id,
+            success: false,
+            error: "Queue service unavailable",
+          });
+        }
+      }
+
+      const successfulRetries = retryResults.filter((r) => r.success).length;
+
+      res.json({
+        success: true,
+        message: `${successfulRetries} notifikasi berhasil di-retry`,
+        data: {
+          retried_count: successfulRetries,
+          retry_results: retryResults,
+        },
+      });
+    } catch (error) {
+      logger.error("Retry failed notifications error:", error);
       res.status(500).json({
         success: false,
         message: "Terjadi kesalahan server",

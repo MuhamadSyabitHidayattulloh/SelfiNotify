@@ -15,7 +15,7 @@ class SocketService {
   initialize(server) {
     this.io = new Server(server, {
       cors: {
-        origin: "http://localhost:5175", // Alamat frontend
+        origin: process.env.CORS_ORIGIN || "*",
         methods: ["GET", "POST"],
       },
       transports: ["websocket", "polling"],

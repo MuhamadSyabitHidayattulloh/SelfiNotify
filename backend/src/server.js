@@ -7,6 +7,7 @@ const path = require("path");
 const config = require("./config");
 const database = require("./config/database");
 const socketService = require("./services/socket.service");
+const queueService = require("./services/queue.service");
 const apiRoutes = require("./api");
 const logger = require("./utils/logger");
 
@@ -34,8 +35,15 @@ app.use((req, res, next) => {
 // Initialize Socket.IO
 socketService.initialize(server);
 
-// Make Socket.IO available to controllers
-app.set("io", socketService.getIO());
+// Make Socket.IO available to controllers and queue service
+const io = socketService.getIO();
+app.set("io", io);
+
+// Make Socket.IO available globally for queue service
+global.io = io;
+
+// Initialize Queue Service
+let queueInitialized = false;
 
 // API Routes
 app.use("/api", apiRoutes);
@@ -44,13 +52,38 @@ app.use("/api", apiRoutes);
 app.use(express.static(path.join(__dirname, "../../frontend/dist")));
 
 // Health check endpoint
-app.get("/health", (req, res) => {
-  res.json({
-    success: true,
-    message: "SelfiNotify Server is running",
-    timestamp: new Date().toISOString(),
-    version: "1.0.0",
-  });
+app.get("/health", async (req, res) => {
+  try {
+    // Check database health
+    const dbHealth = await database.healthCheck();
+
+    // Check Redis health
+    const redisHealth = await require("./config/redis").healthCheck();
+
+    // Check queue service health
+    const queueHealth = queueInitialized
+      ? await queueService.getQueueStats()
+      : { status: "not_initialized" };
+
+    res.json({
+      success: true,
+      message: "SelfiNotify Server is running",
+      timestamp: new Date().toISOString(),
+      version: "1.0.0",
+      services: {
+        database: dbHealth,
+        redis: redisHealth,
+        queue: queueHealth,
+      },
+    });
+  } catch (error) {
+    logger.error("Health check failed:", error);
+    res.status(500).json({
+      success: false,
+      message: "Health check failed",
+      error: error.message,
+    });
+  }
 });
 
 // Catch-all handler for SPA (Single Page Application)
@@ -93,6 +126,18 @@ async function startServer() {
     await database.connectDB();
     logger.info("Database connected successfully");
 
+    // Initialize queue service
+    try {
+      await queueService.initialize();
+      queueInitialized = true;
+      logger.info("Queue service initialized successfully");
+    } catch (queueError) {
+      logger.error("Failed to initialize queue service:", queueError);
+      logger.warn(
+        "Server will start without queue service. Notifications will not be processed."
+      );
+    }
+
     // Start server
     server.listen(config.port, "0.0.0.0", () => {
       logger.info("=".repeat(50));
@@ -104,6 +149,9 @@ async function startServer() {
         `📊 API endpoints available at: http://localhost:${config.port}/api`
       );
       logger.info(`❤️  Health check: http://localhost:${config.port}/health`);
+      logger.info(
+        `📨 Queue Service: ${queueInitialized ? "✅ Active" : "❌ Inactive"}`
+      );
       logger.info("=".repeat(50));
     });
   } catch (error) {
@@ -113,21 +161,35 @@ async function startServer() {
 }
 
 // Handle graceful shutdown
-process.on("SIGTERM", () => {
-  logger.info("SIGTERM received, shutting down gracefully");
-  server.close(() => {
-    logger.info("HTTP server closed");
-    process.exit(0);
-  });
-});
+async function gracefulShutdown(signal) {
+  logger.info(`${signal} received, shutting down gracefully`);
 
-process.on("SIGINT", () => {
-  logger.info("SIGINT received, shutting down gracefully");
-  server.close(() => {
-    logger.info("HTTP server closed");
-    process.exit(0);
-  });
-});
+  try {
+    // Shutdown queue service
+    if (queueInitialized) {
+      await queueService.shutdown();
+      logger.info("Queue service shutdown completed");
+    }
+
+    // Close HTTP server
+    server.close(() => {
+      logger.info("HTTP server closed");
+      process.exit(0);
+    });
+
+    // Force exit after 30 seconds
+    setTimeout(() => {
+      logger.error("Forced shutdown after timeout");
+      process.exit(1);
+    }, 30000);
+  } catch (error) {
+    logger.error("Error during graceful shutdown:", error);
+    process.exit(1);
+  }
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (err) => {

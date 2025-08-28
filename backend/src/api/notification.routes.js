@@ -4,74 +4,84 @@ const { verifyToken } = require("../middleware/auth.middleware");
 
 const router = express.Router();
 
-/**
- * @route POST /api/notifications/send
- * @desc Send notification to application
- * @access Private
- */
-router.post("/send", verifyToken, NotificationController.send);
+// Apply auth middleware to all routes
+router.use(verifyToken);
 
 /**
- * @route POST /api/notifications/bulk-send
- * @desc Send notification to multiple applications
+ * @route POST /api/notifications/send
+ * @desc Send notification to single application
  * @access Private
  */
-router.post("/bulk-send", verifyToken, NotificationController.bulkSend);
+router.post("/send", NotificationController.send);
 
 /**
  * @route POST /api/notifications/test
- * @desc Send test notification
+ * @desc Send test notification to application
  * @access Private
  */
-router.post("/test", verifyToken, NotificationController.sendTest);
+router.post("/test", NotificationController.sendTest);
+
+/**
+ * @route GET /api/notifications/stats/overview
+ * @desc Get notification statistics and queue status
+ * @access Private
+ */
+router.get("/stats/overview", NotificationController.getStats);
 
 /**
  * @route GET /api/notifications/history
- * @desc Get user's notification history
+ * @desc Get notification history with filters
  * @access Private
  */
-router.get("/history", verifyToken, NotificationController.getHistory);
+router.get("/history", NotificationController.getHistory);
 
 /**
- * @route GET /api/notifications/stats
- * @desc Get notification statistics
+ * @route DELETE /api/notifications/bulk/delete
+ * @desc Bulk delete multiple notifications
  * @access Private
  */
-router.get("/stats", verifyToken, NotificationController.getStats);
+router.delete("/bulk/delete", NotificationController.bulkDelete);
 
 /**
- * @route GET /api/notifications/all
- * @desc Get all notifications
+ * @route POST /api/notifications/bulk/send
+ * @desc Send notification to multiple applications
  * @access Private
  */
-router.get("/all", verifyToken, NotificationController.getAll);
+router.post("/bulk/send", NotificationController.bulkSend);
+
+/**
+ * @route POST /api/notifications/retry/failed
+ * @desc Retry failed notifications
+ * @access Private
+ */
+router.post("/retry/failed", NotificationController.retryFailed);
+
+/**
+ * @route GET /api/notifications
+ * @desc Get all notifications with optional filters
+ * @access Private
+ */
+router.get("/", NotificationController.getAll);
 
 /**
  * @route GET /api/notifications/:id
  * @desc Get notification by ID
  * @access Private
  */
-router.get("/:id", verifyToken, NotificationController.getById);
+router.get("/:id", NotificationController.getById);
 
 /**
  * @route POST /api/notifications/:id/resend
- * @desc Resend notification
+ * @desc Resend specific notification
  * @access Private
  */
-router.post("/:id/resend", verifyToken, NotificationController.resend);
+router.post("/:id/resend", NotificationController.resend);
 
 /**
  * @route DELETE /api/notifications/:id
- * @desc Delete notification
+ * @desc Delete specific notification
  * @access Private
  */
-router.delete("/:id", verifyToken, NotificationController.delete);
-
-/**
- * @route POST /api/notifications/bulk-delete
- * @desc Bulk delete notifications
- * @access Private
- */
-router.post("/bulk-delete", verifyToken, NotificationController.bulkDelete);
+router.delete("/:id", NotificationController.delete);
 
 module.exports = router;

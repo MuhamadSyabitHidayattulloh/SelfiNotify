@@ -30,9 +30,32 @@ const Notification = sequelize.define(
       type: DataTypes.STRING(500),
       allowNull: true,
     },
+    status: {
+      type: DataTypes.ENUM("pending", "queued", "sent", "delivered", "failed"),
+      defaultValue: "pending",
+      allowNull: false,
+    },
+    delivery_attempts: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      allowNull: false,
+    },
+    max_retries: {
+      type: DataTypes.INTEGER,
+      defaultValue: 3,
+      allowNull: false,
+    },
+    last_delivery_attempt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
     sent_at: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
+    },
+    delivered_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
   },
   {
